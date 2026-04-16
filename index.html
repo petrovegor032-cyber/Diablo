@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Идеальные орбы</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Финальная версия</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -124,8 +124,6 @@
             gap: 20px;
             z-index: 1000;
         }
-        
-        /* Идеальные орбы — без чёрных полос! */
         .orb {
             position: relative;
             width: 90px;
@@ -138,18 +136,15 @@
             border: 2px solid #d4af37;
             box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2);
             animation: orbPulse 2s infinite ease-in-out;
-            overflow: visible;
-            background: #150505;
+            overflow: hidden;
         }
         @keyframes orbPulse {
             0% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
             50% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.7), inset 0 0 15px rgba(255,255,255,0.3); }
             100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
         }
-        .orb-hp { background: #1a0000; }
-        .orb-mana { background: #000a1a; }
-        
-        /* Заливка через clip-path — скрывает стык на 100% */
+        .orb-hp { background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000); }
+        .orb-mana { background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a); }
         .orb-fill {
             position: absolute;
             bottom: 0;
@@ -158,22 +153,8 @@
             background: #e34d4d;
             transition: height 0.2s ease-out;
             z-index: 0;
-            clip-path: ellipse(100% 100% at 50% 100%);
         }
         .mana-fill { background: #4d7ae3; }
-        
-        /* Маска, которая скрывает верхнюю часть заливки */
-        .orb-mask {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: transparent;
-            z-index: 1;
-            pointer-events: none;
-        }
-        
         .orb-content {
             position: relative;
             z-index: 2;
@@ -260,7 +241,6 @@
     <!-- Красный шар (жизнь) слева -->
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
-        <div class="orb-mask"></div>
         <div class="orb-content">
             <div class="orb-icon">❤️</div>
             <div class="orb-value"><span id="hpCurrent">100</span>/<span id="hpMax">100</span></div>
@@ -276,7 +256,6 @@
     <!-- Синий шар (мана) справа -->
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
-        <div class="orb-mask"></div>
         <div class="orb-content">
             <div class="orb-icon">🪄</div>
             <div class="orb-value"><span id="manaCurrent">100</span>/<span id="manaMax">100</span></div>
@@ -286,10 +265,12 @@
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: ИДЕАЛЬНЫЕ ОРБЫ (БЕЗ ЧЁРНЫХ ПОЛОС)
-    //  - clip-path для заливки
-    //  - Нижний блок статуса удалён
-    //  - GPS вверху
+    //  GEO-DIABLO 3: ФИНАЛ
+    //  - Красный шар слева, синий справа, информация между ними
+    //  - Огонь летит на 50 метров
+    //  - Все события в верхней панели
+    //  - GPS вверху, счётчик ресурсов добавлен
+    //  - НИЖНИЙ БЛОК STATUS-BAR УДАЛЁН
     // ============================================================
     
     let map;
