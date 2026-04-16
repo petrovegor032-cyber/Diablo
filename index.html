@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Светящиеся орбы + Вертикальные кнопки</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Идеальная верстка</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -22,7 +22,7 @@
         
         /* ========== Diablo 3 HUD ========== */
         
-        /* Верхняя панель: золото, опыт, уровень */
+        /* Верхняя панель: золото, опыт, уровень + события */
         .top-stats {
             position: fixed;
             top: 12px;
@@ -58,8 +58,19 @@
             padding: 4px 16px;
             border-radius: 40px;
         }
+        .event-message {
+            background: rgba(0,0,0,0.7);
+            padding: 4px 16px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            color: #ffcc66;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         
-        /* Правый столбик: кнопки атаки */
+        /* Правый столбик: кнопки атаки (остаются) */
         .action-sidebar {
             position: fixed;
             right: 12px;
@@ -105,19 +116,22 @@
         .melee-btn { background: #5a3a1a; border-bottom: 3px solid #b87a2a; }
         .fireball-btn { background: #6a2a1a; border-bottom: 3px solid #e34d4d; }
         
-        /* Нижние орбы здоровья и маны (свечение, плавная заливка) */
+        /* Нижняя панель: орбы жизни (слева) и маны (справа) */
         .bottom-orbs {
             position: fixed;
             bottom: 20px;
             left: 20px;
+            right: 20px;
             display: flex;
-            gap: 15px;
+            justify-content: space-between;
+            align-items: flex-end;
             z-index: 1000;
+            pointer-events: none;
         }
         .orb {
             position: relative;
-            width: 85px;
-            height: 85px;
+            width: 90px;
+            height: 90px;
             border-radius: 50%;
             background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000);
             display: flex;
@@ -125,14 +139,15 @@
             align-items: center;
             justify-content: center;
             border: 2px solid #d4af37;
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(255,255,255,0.2);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2);
             animation: orbPulse 2s infinite ease-in-out;
             overflow: hidden;
+            pointer-events: auto;
         }
         @keyframes orbPulse {
-            0% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(255,255,255,0.2); }
-            50% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.6), inset 0 0 15px rgba(255,255,255,0.3); }
-            100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(255,255,255,0.2); }
+            0% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
+            50% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.7), inset 0 0 15px rgba(255,255,255,0.3); }
+            100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
         }
         .orb-hp { background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000); }
         .orb-mana { background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a); }
@@ -156,18 +171,20 @@
         .orb-icon { font-size: 28px; filter: drop-shadow(0 0 4px gold); }
         .orb-value { font-size: 14px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
         
-        .mode-indicator {
-            position: fixed;
-            bottom: 120px;
-            right: 20px;
+        /* Индикатор выбранного оружия между орбами */
+        .weapon-indicator {
             background: rgba(0,0,0,0.85);
-            border-radius: 30px;
-            padding: 6px 16px;
-            color: #ffefb9;
-            z-index: 1000;
-            font-size: 12px;
+            backdrop-filter: blur(12px);
+            border-radius: 40px;
+            padding: 8px 20px;
+            margin-bottom: 20px;
             border: 1px solid #d4af37;
             font-family: monospace;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffefb9;
+            pointer-events: none;
+            text-align: center;
         }
         
         .status-bar {
@@ -200,12 +217,14 @@
         @keyframes hitFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
         
         @media (max-width: 700px) {
-            .orb { width: 65px; height: 65px; }
+            .orb { width: 70px; height: 70px; }
             .orb-icon { font-size: 22px; }
             .orb-value { font-size: 10px; }
             .action-btn { width: 55px; height: 55px; font-size: 24px; }
             .top-stats { font-size: 12px; padding: 4px 12px; }
             .stat-item { padding: 2px 10px; }
+            .event-message { max-width: 150px; font-size: 10px; }
+            .weapon-indicator { font-size: 11px; padding: 4px 12px; margin-bottom: 10px; }
         }
     </style>
 </head>
@@ -214,14 +233,15 @@
 <div id="map"></div>
 <canvas id="fogCanvas"></canvas>
 
-<!-- Верхняя панель: золото, опыт, уровень -->
+<!-- Верхняя панель: золото, опыт, уровень + события -->
 <div class="top-stats">
     <div class="top-stats-left">
         <div class="stat-item">🧙‍♀️ Уровень <span id="lvl">1</span></div>
         <div class="stat-item">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
+        <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
     </div>
     <div class="top-stats-right">
-        <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
+        <div class="event-message" id="eventMessage">🔮 Добро пожаловать</div>
     </div>
 </div>
 
@@ -231,7 +251,7 @@
     <button id="fireballBtn" class="action-btn fireball-btn">🔥<span>Огонь</span></button>
 </div>
 
-<!-- Нижние орбы здоровья и маны -->
+<!-- Нижняя панель: орбы жизни (слева) и маны (справа) -->
 <div class="bottom-orbs">
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
@@ -240,6 +260,12 @@
             <div class="orb-value"><span id="hpCurrent">100</span>/<span id="hpMax">100</span></div>
         </div>
     </div>
+    
+    <!-- Индикатор выбранного оружия между орбами -->
+    <div class="weapon-indicator" id="weaponIndicator">
+        ⚔️ Режим: Удар
+    </div>
+    
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
         <div class="orb-content">
@@ -249,10 +275,6 @@
     </div>
 </div>
 
-<div class="mode-indicator" id="modeIndicator">
-    ⚔️ <span id="modeText">Удар</span> | <span id="manaCostInfo">бесплатно</span>
-</div>
-
 <div class="status-bar">
     <span class="led" id="gpsLed"></span>
     <span id="statusText">🌍 Включи GPS</span>
@@ -260,10 +282,10 @@
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: СВЕТЯЩИЕСЯ ОРБЫ + ВЕРТИКАЛЬНЫЕ КНОПКИ
-    //  - Верх: золото, опыт, уровень
+    //  GEO-DIABLO 3: ИДЕАЛЬНАЯ ВЕРСТКА
+    //  - Верх: золото, опыт, уровень, события
     //  - Правый столбик: кнопки атаки
-    //  - Низ: орбы здоровья и маны с анимацией
+    //  - Низ: орб жизни слева, орб маны справа, между ними индикатор оружия
     //  - Туман войны, автоцентр, волшебница с огнём с 1 уровня
     // ============================================================
     
@@ -295,6 +317,19 @@
     const MAX_MONSTERS = 6;
     const SPAWN_RADIUS = 70;
     const MIN_SPAWN_DIST = 30;
+    
+    // Функция для отображения событий в верхней панели
+    function showEventMessage(msg, isError = false) {
+        const eventDiv = document.getElementById('eventMessage');
+        eventDiv.innerHTML = msg;
+        eventDiv.style.color = isError ? '#ff8888' : '#ffcc66';
+        setTimeout(() => {
+            if (document.getElementById('eventMessage').innerHTML === msg) {
+                eventDiv.innerHTML = '🔮 Готов к бою';
+                eventDiv.style.color = '#ffcc66';
+            }
+        }, 3000);
+    }
     
     // ----------------------------------------------------------
     // ТУМАН ВОЙНЫ
@@ -422,24 +457,28 @@
         document.getElementById('gold').innerText = player.gold;
         document.getElementById('xp').innerText = player.xp;
         document.getElementById('xpNext').innerText = player.lvl * 100;
-        document.getElementById('hpFillOrb').style.height = (player.hp / player.maxHp * 100) + '%';
-        document.getElementById('manaFillOrb').style.height = (player.mana / player.maxMana * 100) + '%';
+        
+        // Плавная заливка орбов (без чёрных полос)
+        const hpPercent = (player.hp / player.maxHp * 100);
+        const manaPercent = (player.mana / player.maxMana * 100);
+        document.getElementById('hpFillOrb').style.height = hpPercent + '%';
+        document.getElementById('manaFillOrb').style.height = manaPercent + '%';
     }
     
     function setActiveMode(mode) {
         activeMode = mode;
         const meleeBtn = document.getElementById('meleeBtn');
         const fireBtn = document.getElementById('fireballBtn');
+        const weaponIndicator = document.getElementById('weaponIndicator');
+        
         if (mode === 'melee') {
             meleeBtn.classList.add('active');
             fireBtn.classList.remove('active');
-            document.getElementById('modeText').innerText = 'Удар';
-            document.getElementById('manaCostInfo').innerText = 'бесплатно';
+            weaponIndicator.innerHTML = '⚔️ Режим: Удар';
         } else {
             fireBtn.classList.add('active');
             meleeBtn.classList.remove('active');
-            document.getElementById('modeText').innerText = 'Огонь';
-            document.getElementById('manaCostInfo').innerText = '30 маны';
+            weaponIndicator.innerHTML = '🔥 Режим: Огонь (30 маны)';
         }
     }
     
@@ -459,22 +498,22 @@
     function meleeAttack(monster) {
         if (!currentLocation) return;
         const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
-        if (dist > 15) { document.getElementById('statusText').innerHTML = `❌ Далеко (${Math.floor(dist)}м)`; return; }
+        if (dist > 15) { showEventMessage(`❌ Далеко (${Math.floor(dist)}м)`, true); return; }
         monster.hp -= 25;
-        document.getElementById('statusText').innerHTML = `⚔️ Удар! ${monster.hp} ❤️`;
+        showEventMessage(`⚔️ Удар! ${monster.hp} ❤️ осталось`);
         if (monster.hp <= 0) killMonster(monster);
         hitFlash();
     }
     
     function fireballAttack(monster) {
-        if (player.mana < 30) { document.getElementById('statusText').innerHTML = '❌ Нет маны'; return; }
+        if (player.mana < 30) { showEventMessage('❌ Нет маны', true); return; }
         if (!currentLocation) return;
         const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
-        if (dist > 30) { document.getElementById('statusText').innerHTML = `❌ Далеко (${Math.floor(dist)}м)`; return; }
+        if (dist > 30) { showEventMessage(`❌ Далеко (${Math.floor(dist)}м)`, true); return; }
         player.mana -= 30;
         monster.hp -= 45;
         updateUI();
-        document.getElementById('statusText').innerHTML = `🔥 Огонь! ${monster.hp} ❤️`;
+        showEventMessage(`🔥 Огонь! ${monster.hp} ❤️ осталось`);
         if (monster.hp <= 0) killMonster(monster);
         hitFlash();
         setTimeout(() => { if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 5); updateUI(); } }, 1000);
@@ -493,11 +532,11 @@
             player.hp = player.maxHp;
             player.maxMana += 10;
             player.mana = player.maxMana;
-            document.getElementById('statusText').innerHTML = `🎉 УРОВЕНЬ ${player.lvl}!`;
+            showEventMessage(`🎉 УРОВЕНЬ ${player.lvl}!`);
         }
         updateUI();
         removeMonster(monster.id);
-        document.getElementById('statusText').innerHTML = `💀 +${gainXp} XP, +${gainGold} 🪙`;
+        showEventMessage(`💀 +${gainXp} XP, +${gainGold} 🪙`);
         if (Math.random() < 0.3) addInteractive(monster.lat, monster.lng, Math.random() < 0.7 ? 'barrel' : 'chest');
     }
     
@@ -529,7 +568,7 @@
         if (obj.marker) map.removeLayer(obj.marker);
         const idx = interactives.findIndex(i => i.id === obj.id);
         if (idx !== -1) interactives.splice(idx, 1);
-        document.getElementById('statusText').innerHTML = `📦 +${obj.gold}🪙 +${obj.mana}🪄`;
+        showEventMessage(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
     }
     
     function addMonster(lat, lng, type) {
@@ -576,7 +615,6 @@
             accuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#8bc34a', weight: 1, fillOpacity: 0.1 }).addTo(map);
         }
         document.getElementById('gpsLed').classList.add('active');
-        document.getElementById('statusText').innerHTML = '🔮 Кликай по монстрам!';
         centerOnPlayer();
         revealArea(lat, lng);
     }
