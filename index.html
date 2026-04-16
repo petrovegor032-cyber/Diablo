@@ -20,9 +20,7 @@
             z-index: 2;
         }
         
-        /* ========== Diablo 3 HUD ========== */
-        
-        /* Верхняя панель: статистика + события */
+        /* Верхняя панель: только статистика и события */
         .top-stats {
             position: fixed;
             top: 12px;
@@ -126,17 +124,22 @@
             width: 90px;
             height: 90px;
             border-radius: 50%;
-            background: #1a0a0a;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             border: 2px solid #d4af37;
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 5px rgba(255,255,255,0.1);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2);
+            animation: orbPulse 2s infinite ease-in-out;
             overflow: hidden;
         }
-        .orb-hp { background: #1a0a0a; }
-        .orb-mana { background: #0a0a1a; }
+        @keyframes orbPulse {
+            0% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
+            50% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.7), inset 0 0 15px rgba(255,255,255,0.3); }
+            100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
+        }
+        .orb-hp { background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000); }
+        .orb-mana { background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a); }
         .orb-fill {
             position: absolute;
             bottom: 0;
@@ -190,8 +193,8 @@
             font-family: monospace;
             color: #ffefb9;
         }
-        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; animation: pulse 1s infinite; }
-        .led.active { background-color: #8bc34a; }
+        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; }
+        .led.active { background-color: #8bc34a; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
         
         .hit-effect {
@@ -210,6 +213,7 @@
             .orb-value { font-size: 10px; }
             .action-btn { width: 55px; height: 55px; font-size: 24px; }
             .info-center { font-size: 0.8rem; padding: 8px 12px; }
+            .info-center .mode-name { font-size: 1rem; }
             .stats-left { gap: 8px; }
             .stat-item { padding: 2px 10px; font-size: 0.7rem; }
             .event-area { max-width: 150px; font-size: 0.7rem; }
@@ -227,7 +231,6 @@
         <div class="stat-item">🧙‍♀️ Ур. <span id="lvl">1</span></div>
         <div class="stat-item">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
         <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
-        <div class="stat-item">📦 <span id="resources">0</span></div>
     </div>
     <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
 </div>
@@ -240,6 +243,7 @@
 
 <!-- Нижняя панель: красный шар (слева) + информация (центр) + синий шар (справа) -->
 <div class="bottom-panel">
+    <!-- Красный шар (жизнь) слева -->
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
         <div class="orb-content">
@@ -248,11 +252,13 @@
         </div>
     </div>
     
+    <!-- Центральная информационная панель -->
     <div class="info-center" id="infoCenter">
         <div class="mode-name">⚔️ Режим: Удар</div>
         <div class="mode-cost">💰 Бесплатно</div>
     </div>
     
+    <!-- Синий шар (мана) справа -->
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
         <div class="orb-content">
@@ -264,17 +270,15 @@
 
 <div class="status-bar">
     <span class="led" id="gpsLed"></span>
-    <span id="statusText">🌍 Запрос GPS...</span>
+    <span id="statusText">🌍 Включи GPS</span>
 </div>
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: ФИНАЛЬНАЯ ВЕРСИЯ
-    //  - Авто-запрос GPS при загрузке
-    //  - Без кнопки на шарах
-    //  - Статистика ресурсов вверху
-    //  - Нормальный зум карты
-    //  - Красный шар слева, синий справа
+    //  GEO-DIABLO 3: ФИНАЛ
+    //  - Красный шар слева, синий справа, информация между ними
+    //  - Огонь летит на 50 метров
+    //  - Все события в верхней панели
     // ============================================================
     
     let map;
@@ -294,8 +298,7 @@
         mana: 100,
         maxMana: 100,
         xp: 0,
-        gold: 0,
-        resources: 0
+        gold: 0
     };
     
     let activeMode = 'melee';
@@ -306,7 +309,7 @@
     const MAX_MONSTERS = 6;
     const SPAWN_RADIUS = 70;
     const MIN_SPAWN_DIST = 30;
-    const FIREBALL_RANGE = 50;
+    const FIREBALL_RANGE = 50; // увеличено до 50 метров
     
     function showEventMessage(msg, isError = false) {
         const eventDiv = document.getElementById('eventMessage');
@@ -366,10 +369,10 @@
     }
     
     // ----------------------------------------------------------
-    // КАРТА + АВТОЦЕНТР (нормальный зум)
+    // КАРТА + АВТОЦЕНТР
     // ----------------------------------------------------------
     function initMap() {
-        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 16);
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OSM',
             subdomains: 'abcd',
@@ -401,7 +404,7 @@
     }
     
     function centerOnPlayer() {
-        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 16);
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
     }
     
     // ----------------------------------------------------------
@@ -446,7 +449,6 @@
         document.getElementById('gold').innerText = player.gold;
         document.getElementById('xp').innerText = player.xp;
         document.getElementById('xpNext').innerText = player.lvl * 100;
-        document.getElementById('resources').innerText = player.resources;
         
         const hpPercent = (player.hp / player.maxHp * 100);
         const manaPercent = (player.mana / player.maxMana * 100);
@@ -553,7 +555,6 @@
         player.gold += obj.gold;
         player.mana = Math.min(player.maxMana, player.mana + obj.mana);
         if (obj.type === 'altar') player.maxMana += 10;
-        player.resources++;
         updateUI();
         if (obj.marker) map.removeLayer(obj.marker);
         const idx = interactives.findIndex(i => i.id === obj.id);
@@ -595,7 +596,7 @@
     }
     
     // ----------------------------------------------------------
-    // GPS + АВТОЦЕНТР + РАСКРЫТИЕ ТУМАНА (авто-запрос)
+    // GPS + АВТОЦЕНТР + ТУМАН
     // ----------------------------------------------------------
     function updatePlayerOnMap(lat, lng, accuracy) {
         if (playerMarker) map.removeLayer(playerMarker);
@@ -605,7 +606,6 @@
             accuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#8bc34a', weight: 1, fillOpacity: 0.1 }).addTo(map);
         }
         document.getElementById('gpsLed').classList.add('active');
-        document.getElementById('statusText').innerHTML = '🟢 GPS активен';
         centerOnPlayer();
         revealArea(lat, lng);
     }
@@ -621,44 +621,32 @@
     }
     
     function startGPS() {
-        if (!navigator.geolocation) {
-            showEventMessage('❌ GPS не поддерживается', true);
-            return;
-        }
+        if (!navigator.geolocation) { alert("GPS не поддерживается"); return; }
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 if (watchId) navigator.geolocation.clearWatch(watchId);
-                watchId = navigator.geolocation.watchPosition(onLocation, (err) => {
-                    console.error(err);
-                    showEventMessage('❌ Ошибка GPS', true);
-                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                watchId = navigator.geolocation.watchPosition(onLocation, console.error, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
                 onLocation(pos);
             },
-            (err) => {
-                console.error(err);
-                showEventMessage('❌ Разрешите GPS в настройках', true);
-                document.getElementById('statusText').innerHTML = '❌ GPS запрещён';
-            },
+            () => alert("Разрешите GPS"),
             { enableHighAccuracy: true, timeout: 10000 }
         );
     }
     
     // ----------------------------------------------------------
-    // ЗАПУСК (авто-запрос GPS)
+    // ЗАПУСК
     // ----------------------------------------------------------
     window.onload = () => {
         initMap();
-        startGPS(); // авто-запрос при загрузке
+        startGPS();
         document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
         document.getElementById('fireballBtn').onclick = () => setActiveMode('fireball');
         setActiveMode('melee');
         updateUI();
-        
         setTimeout(() => {
             if (currentLocation) for (let i = 0; i < 3; i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
             else { addMonster(55.751244, 37.618423, 'zombie'); addMonster(55.7515, 37.6188, 'skeleton_melee'); }
         }, 2000);
-        
         setInterval(() => {
             if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 2); updateUI(); }
             if (player.hp < player.maxHp && monsters.filter(m => distance(currentLocation?.lat, currentLocation?.lng, m.lat, m.lng) < 25).length === 0) {
