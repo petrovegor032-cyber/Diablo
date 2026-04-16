@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Окончательная версия</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Светящиеся орбы + Вертикальные кнопки</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -105,7 +105,7 @@
         .melee-btn { background: #5a3a1a; border-bottom: 3px solid #b87a2a; }
         .fireball-btn { background: #6a2a1a; border-bottom: 3px solid #e34d4d; }
         
-        /* Нижняя панель: орбы здоровья и маны */
+        /* Нижние орбы здоровья и маны (свечение, плавная заливка) */
         .bottom-orbs {
             position: fixed;
             bottom: 20px;
@@ -119,24 +119,30 @@
             width: 85px;
             height: 85px;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, #2a0000, #1a0000);
+            background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             border: 2px solid #d4af37;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(255,255,255,0.2);
+            animation: orbPulse 2s infinite ease-in-out;
+            overflow: hidden;
         }
-        .orb-hp { background: radial-gradient(circle at 30% 30%, #3a0a0a, #1a0000); }
-        .orb-mana { background: radial-gradient(circle at 30% 30%, #0a1a3a, #000a1a); }
+        @keyframes orbPulse {
+            0% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(255,255,255,0.2); }
+            50% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.6), inset 0 0 15px rgba(255,255,255,0.3); }
+            100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(255,255,255,0.2); }
+        }
+        .orb-hp { background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000); }
+        .orb-mana { background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a); }
         .orb-fill {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
             background: #e34d4d;
-            border-radius: 50%;
-            transition: height 0.2s;
+            transition: height 0.2s ease-out;
             z-index: 0;
         }
         .mana-fill { background: #4d7ae3; }
@@ -147,7 +153,7 @@
             font-weight: bold;
             text-shadow: 0 0 5px black;
         }
-        .orb-icon { font-size: 28px; }
+        .orb-icon { font-size: 28px; filter: drop-shadow(0 0 4px gold); }
         .orb-value { font-size: 14px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
         
         .mode-indicator {
@@ -254,10 +260,10 @@
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: ФИНАЛЬНАЯ ВЕРСИЯ
+    //  GEO-DIABLO 3: СВЕТЯЩИЕСЯ ОРБЫ + ВЕРТИКАЛЬНЫЕ КНОПКИ
     //  - Верх: золото, опыт, уровень
     //  - Правый столбик: кнопки атаки
-    //  - Низ: орбы здоровья и маны
+    //  - Низ: орбы здоровья и маны с анимацией
     //  - Туман войны, автоцентр, волшебница с огнём с 1 уровня
     // ============================================================
     
