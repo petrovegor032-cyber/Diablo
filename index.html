@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Некромант | Фикс масштаба и видимости</title>
+    <title>⚔️ Некромант | Прицельный обзор | Ходячие зомби</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -20,7 +20,7 @@
             z-index: 2;
         }
         
-        /* ХУД (оставляем компактным) */
+        /* Верхняя панель */
         .top-stats {
             position: fixed;
             top: 12px;
@@ -59,7 +59,7 @@
             text-overflow: ellipsis;
         }
         
-        /* Кнопки действий (горизонтально внизу) */
+        /* Кнопки действий */
         .action-bar {
             position: fixed;
             bottom: 20px;
@@ -132,7 +132,7 @@
 
 <div class="top-stats">
     <div class="stats-left">
-        <div class="stat-item">🧙‍♂️ Ур. <span id="lvl">1</span></div>
+        <div class="stat-item">💀 Ур. <span id="lvl">1</span></div>
         <div class="stat-item">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
         <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
         <div class="stat-item">📦 <span id="resources">0</span></div>
@@ -143,14 +143,14 @@
 
 <div class="action-bar">
     <div class="action-btn" id="meleeBtn">⚔️</div>
-    <div class="action-btn" id="summonBtn">🧟<span class="potion-count" id="summonCost">50</span></div>
+    <div class="action-btn" id="summonBtn">💀<span class="potion-count" id="summonCost">50</span></div>
     <div class="action-btn hp-potion" id="hpPotionBtn">🧪<span class="potion-count" id="hpPotionCount">3</span></div>
     <div class="action-btn mana-potion" id="manaPotionBtn">💧<span class="potion-count" id="manaPotionCount">2</span></div>
 </div>
 
 <script>
     // ============================================================
-    //  ФИКС: ЗУМ 15 (реалистичный масштаб), ЛИНИЯ ВИДИМОСТИ, РАССТОЯНИЕ
+    //  НЕКРОМАНТ | ПРИЦЕЛЬНЫЙ ЗУМ 17 | ХОДЯЧИЕ ЗОМБИ | УЛУЧШАЮЩИЙСЯ МИНЬОН
     // ============================================================
     
     let map, playerMarker, watchId, currentLocation;
@@ -161,19 +161,18 @@
     let activeMode = 'melee';
     let audioEnabled = false;
     
-    // Игрок
     let player = {
         lvl: 1, hp: 100, maxHp: 100, mana: 100, maxMana: 100,
         xp: 0, gold: 0, resources: 0, hpPotions: 3, manaPotions: 2
     };
     
-    // Константы
     const MAX_MONSTERS = 6;
-    const SPAWN_RADIUS = 70;
-    const MIN_SPAWN_DIST = 30;
+    const SPAWN_RADIUS = 50;      // Ближе к игроку
+    const MIN_SPAWN_DIST = 20;
     const COLLECT_RADIUS = 8;
     const MELEE_RANGE = 15;
-    const FOG_RADIUS_METERS = 70;
+    const ZOMBIE_SPEED = 0.00003;
+    const MINION_SPEED = 0.00005;
     
     // ---- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ----
     function distance(lat1,lng1,lat2,lng2) {
@@ -183,21 +182,17 @@
         return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
     
-    // ПРОВЕРКА ВИДИМОСТИ (без препятствий)
-    function isVisible(lat1, lng1, lat2, lng2) {
-        // В реальном мире стены — это здания. OSM не даёт нам их геометрию в браузере.
-        // Поэтому используем упрощённую логику: 
-        // Если расстояние < 40 метров — считаем видимым (на улице обычно прямая видимость).
-        // Если > 40 — используем случайный фактор "поворот улицы".
-        const dist = distance(lat1, lng1, lat2, lng2);
+    // Проверка видимости: на улице обычно прямая видимость до 50 метров
+    function isVisible(lat1,lng1,lat2,lng2) {
+        const dist = distance(lat1,lng1,lat2,lng2);
         if (dist < 40) return true;
-        // На больших расстояниях шанс что стена мешает 30%
-        return Math.random() > 0.3;
+        // за домами/углами шанс потерять видимость растёт
+        return Math.random() > (dist-40)/60;
     }
     
-    // ---- ИНИЦИАЛИЗАЦИЯ КАРТЫ (ЗУМ 15) ----
+    // ---- ИНИЦИАЛИЗАЦИЯ КАРТЫ (ЗУМ 17 — видно одну улицу) ----
     function initMap() {
-        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 15);
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OSM',
             subdomains: 'abcd',
@@ -238,19 +233,17 @@
         map.on('moveend zoomend', drawFog);
         window.drawFog = drawFog;
         
-        // КЛИК ПО КАРТЕ (с проверкой видимости и расстояния)
+        // КЛИК — атака по монстру (только если видим и в пределах досягаемости)
         map.on('click', (e) => {
             if (!currentLocation) return;
             const clickLat = e.latlng.lat;
             const clickLng = e.latlng.lng;
-            
-            // 1. Атака по монстру
             let closestMonster = null;
             let minDist = MELEE_RANGE + 5;
             for (let m of monsters) {
-                const distToMonster = distance(clickLat, clickLng, m.lat, m.lng);
-                if (distToMonster < minDist && isVisible(clickLat, clickLng, m.lat, m.lng)) {
-                    minDist = distToMonster;
+                const d = distance(clickLat, clickLng, m.lat, m.lng);
+                if (d < minDist && isVisible(clickLat, clickLng, m.lat, m.lng)) {
+                    minDist = d;
                     closestMonster = m;
                 }
             }
@@ -258,14 +251,12 @@
                 const playerDist = distance(currentLocation.lat, currentLocation.lng, closestMonster.lat, closestMonster.lng);
                 if (playerDist <= MELEE_RANGE && isVisible(currentLocation.lat, currentLocation.lng, closestMonster.lat, closestMonster.lng)) {
                     meleeAttack(closestMonster);
-                    return;
                 } else {
                     showEventMessage(`❌ Слишком далеко (${Math.floor(playerDist)}м) или за стеной`, true);
-                    return;
                 }
+                return;
             }
-            
-            // 2. Сбор лута
+            // Сбор лута
             for (let obj of interactives) {
                 if (distance(clickLat, clickLng, obj.lat, obj.lng) < COLLECT_RADIUS) {
                     collectInteractive(obj);
@@ -276,11 +267,11 @@
     }
     
     function centerOnPlayer() {
-        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 15);
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
     }
     
     function revealArea(lat, lng) {
-        revealedCircles.push({ lat, lng, radius: FOG_RADIUS_METERS });
+        revealedCircles.push({ lat, lng, radius: FOG_RADIUS });
         if (window.drawFog) window.drawFog();
     }
     
@@ -299,7 +290,7 @@
         const el = document.getElementById('eventMessage');
         el.innerHTML = msg;
         el.style.color = isError ? '#ff8888' : '#ffcc66';
-        setTimeout(() => { if(el.innerHTML === msg) el.innerHTML = '🔮 Готов к бою'; }, 2500);
+        setTimeout(() => { if(el.innerHTML === msg) el.innerHTML = '💀 Готов к бою'; }, 2500);
     }
     
     function hitFlash() {
@@ -344,6 +335,15 @@
             player.maxMana += 10;
             player.mana = player.maxMana;
             showEventMessage(`🎉 УРОВЕНЬ ${player.lvl}!`);
+            // Улучшение миньона (пересоздаём, если активен)
+            if (minion) {
+                const oldLat = minion.lat, oldLng = minion.lng;
+                if (minion.marker) map.removeLayer(minion.marker);
+                const newIcon = L.divIcon({html:`<div style="background:#4a2a6a; width:34px; height:34px; border-radius:50%; border:2px solid #ffaa00; display:flex; align-items:center; justify-content:center; font-size:22px;">💀⭐</div>`, iconSize:[34,34]});
+                const marker = L.marker([oldLat, oldLng], {icon: newIcon}).addTo(map);
+                minion = { marker, lat: oldLat, lng: oldLng, hp: 50 + player.lvl*5, attackCd: 0, target: null };
+                showEventMessage(`🧟 Миньон усилился до ${player.lvl} уровня!`);
+            }
         }
         updateUI();
         removeMonster(monster.id);
@@ -352,15 +352,108 @@
         if (minion && minion.target === monster) minion.target = null;
     }
     
-    // ---- МИР ----
+    // ---- ДВИЖЕНИЕ ЗОМБИ (ИДУТ К ИГРОКУ) ----
+    function updateMonstersMovement() {
+        if (!currentLocation) return;
+        for (let m of monsters) {
+            // Направление к игроку
+            const dx = currentLocation.lat - m.lat;
+            const dy = currentLocation.lng - m.lng;
+            const len = Math.hypot(dx, dy);
+            if (len > 0.00001) {
+                const move = Math.min(ZOMBIE_SPEED, len);
+                m.lat += dx / len * move;
+                m.lng += dy / len * move;
+                m.marker.setLatLng([m.lat, m.lng]);
+            }
+            // Атака, если подошли близко
+            const distToPlayer = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+            if (distToPlayer < 12 && (m.attackCd || 0) <= 0) {
+                player.hp = Math.max(0, player.hp - 8);
+                updateUI();
+                m.attackCd = 30;
+                showEventMessage(`🧟 Зомби атакует! -8 HP`, true);
+                if (player.hp <= 0) {
+                    player.hp = player.maxHp;
+                    player.gold = Math.floor(player.gold * 0.7);
+                    updateUI();
+                    showEventMessage(`💀 ВОСКРЕШЕНИЕ...`, true);
+                }
+                hitFlash();
+            }
+            if (m.attackCd > 0) m.attackCd--;
+        }
+    }
+    
+    // ---- МИНЬОН (улучшается с уровнем) ----
+    function summonMinion(){
+        if(!currentLocation) return;
+        if(player.mana<50){ showEventMessage('❌ Нет маны',true); return; }
+        if(minion){ showEventMessage('❌ Уже есть миньон',true); return; }
+        player.mana-=50;
+        updateUI();
+        const levelBonus = Math.floor(player.lvl / 2);
+        const minionHp = 50 + levelBonus * 10;
+        const iconHtml = player.lvl >= 5 ? '💀⭐' : '💀';
+        const iconColor = player.lvl >= 5 ? '#ffaa00' : '#aaaaff';
+        const minionIcon = L.divIcon({html:`<div style="background:#2a2a5a; width:34px; height:34px; border-radius:50%; border:2px solid ${iconColor}; display:flex; align-items:center; justify-content:center; font-size:22px;">${iconHtml}</div>`, iconSize:[34,34]});
+        const marker = L.marker([currentLocation.lat, currentLocation.lng], {icon: minionIcon}).addTo(map);
+        minion = { marker, lat: currentLocation.lat, lng: currentLocation.lng, hp: minionHp, attackCd: 0, target: null };
+        showEventMessage(`🧟 Миньон призван (уровень ${player.lvl})`);
+    }
+    
+    function updateMinion(){
+        if(!minion || !currentLocation) return;
+        // Поиск цели
+        let target = null;
+        let minDist = 100;
+        for(let m of monsters){
+            const d = distance(minion.lat, minion.lng, m.lat, m.lng);
+            if(d < minDist){
+                minDist = d;
+                target = m;
+            }
+        }
+        if(target){
+            const dx = target.lat - minion.lat;
+            const dy = target.lng - minion.lng;
+            const len = Math.hypot(dx, dy);
+            if(len > 0.00001){
+                const move = Math.min(MINION_SPEED, len);
+                minion.lat += dx / len * move;
+                minion.lng += dy / len * move;
+                minion.marker.setLatLng([minion.lat, minion.lng]);
+            }
+            if(minDist < 15 && (minion.attackCd || 0) <= 0){
+                target.hp -= 15 + Math.floor(player.lvl/2);
+                minion.attackCd = 30;
+                showEventMessage(`💀 Миньон атакует! ${target.hp} ❤️`);
+                if(target.hp <= 0) killMonster(target);
+            }
+        } else {
+            // Идём к игроку
+            const dx = currentLocation.lat - minion.lat;
+            const dy = currentLocation.lng - minion.lng;
+            const len = Math.hypot(dx, dy);
+            if(len > 0.00001){
+                const move = Math.min(MINION_SPEED, len);
+                minion.lat += dx / len * move;
+                minion.lng += dy / len * move;
+                minion.marker.setLatLng([minion.lat, minion.lng]);
+            }
+        }
+        if(minion.attackCd > 0) minion.attackCd--;
+    }
+    
+    // ---- МИР (ИКОНКИ) ----
     function getPlayerIcon() {
-        return L.divIcon({html:`<div style="background:#2c6e2c; width:34px; height:34px; border-radius:50%; border:3px solid #ffd966; display:flex; align-items:center; justify-content:center; font-size:22px;">🧙‍♂️</div>`, iconSize:[34,34]});
+        return L.divIcon({html:`<div style="background:#1a1a2a; width:36px; height:36px; border-radius:50%; border:3px solid #aa66ff; display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 12px #aa66ff;">💀🧙</div>`, iconSize:[36,36]});
     }
     function getMonsterIcon(type) {
-        let e = '🧟‍♂️';
-        if(type==='skeleton_melee') e='💀';
-        else if(type==='skeleton_archer') e='🏹';
-        return L.divIcon({html:`<div style="background:#3a1a1a; width:30px; height:30px; border-radius:50%; border:2px solid #aa4444; display:flex; align-items:center; justify-content:center; font-size:20px;">${e}</div><div style="text-align:center; font-size:10px; color:white;">?</div>`, iconSize:[30,30]});
+        let emoji = '🧟‍♂️';
+        if(type === 'skeleton_melee') emoji = '💀⚔️';
+        else if(type === 'skeleton_archer') emoji = '🏹💀';
+        return L.divIcon({html:`<div style="background:#2a1a1a; width:30px; height:30px; border-radius:50%; border:2px solid #aa4444; display:flex; align-items:center; justify-content:center; font-size:20px;">${emoji}</div>`, iconSize:[30,30]});
     }
     function getInteractiveIcon(type) {
         let e='📦';
@@ -372,8 +465,8 @@
     function addMonster(lat,lng,type){
         let hp=32; if(type==='skeleton_melee') hp=26; if(type==='skeleton_archer') hp=22;
         const id=nextId++, marker=L.marker([lat,lng],{icon:getMonsterIcon(type)}).addTo(map);
-        marker.bindTooltip(`🩸 ${hp} HP | 📍 ${Math.floor(distance(currentLocation?.lat,currentLocation?.lng,lat,lng))}м`, {permanent: false, direction:'top'});
-        monsters.push({id,lat,lng,type,hp,marker});
+        marker.bindTooltip(`🩸 ${hp} HP`, {permanent: false, direction:'top'});
+        monsters.push({id,lat,lng,type,hp,marker, attackCd:0});
     }
     function removeMonster(id){
         const idx=monsters.findIndex(m=>m.id===id);
@@ -418,55 +511,6 @@
         addMonster(newLat,newLng,type);
     }
     
-    // ---- МИНЬОН (упрощённо, без лишней анимации) ----
-    function summonMinion(){
-        if(!currentLocation) return;
-        if(player.mana<50){ showEventMessage('❌ Нет маны',true); return; }
-        if(minion){ showEventMessage('❌ Уже есть миньон',true); return; }
-        player.mana-=50;
-        updateUI();
-        const marker=L.marker([currentLocation.lat,currentLocation.lng],{icon:L.divIcon({html:`<div style="background:#2a5a2a; width:30px; height:30px; border-radius:50%; border:2px solid #0f0; display:flex; align-items:center; justify-content:center; font-size:20px;">🧟</div>`, iconSize:[30,30]})}).addTo(map);
-        minion={marker, lat:currentLocation.lat, lng:currentLocation.lng, hp:50, attackCd:0, target:null};
-        showEventMessage('🧟 Миньон призван!');
-    }
-    function updateMinion(){
-        if(!minion || !currentLocation) return;
-        // Движение к игроку или к монстру
-        let target=null;
-        let minDist=100;
-        for(let m of monsters){
-            const d=distance(minion.lat,minion.lng,m.lat,m.lng);
-            if(d<minDist){ minDist=d; target=m; }
-        }
-        if(target){
-            const dx=target.lat-minion.lat, dy=target.lng-minion.lng;
-            const len=Math.hypot(dx,dy);
-            if(len>0.00001){
-                const move=Math.min(0.00005,len);
-                minion.lat+=dx/len*move;
-                minion.lng+=dy/len*move;
-                minion.marker.setLatLng([minion.lat,minion.lng]);
-            }
-            if(minDist<15 && minion.attackCd<=0){
-                target.hp-=15;
-                minion.attackCd=30;
-                showEventMessage(`🧟 Миньон атакует! ${target.hp} ❤️`);
-                if(target.hp<=0) killMonster(target);
-            }
-        } else {
-            // Идём к игроку
-            const dx=currentLocation.lat-minion.lat, dy=currentLocation.lng-minion.lng;
-            const len=Math.hypot(dx,dy);
-            if(len>0.00001){
-                const move=Math.min(0.00005,len);
-                minion.lat+=dx/len*move;
-                minion.lng+=dy/len*move;
-                minion.marker.setLatLng([minion.lat,minion.lng]);
-            }
-        }
-        if(minion.attackCd>0) minion.attackCd--;
-    }
-    
     // ---- GPS ----
     function updatePlayerOnMap(lat,lng,acc){
         if(playerMarker) map.removeLayer(playerMarker);
@@ -475,10 +519,10 @@
         document.getElementById('statusText').innerHTML='🟢 Активен';
         centerOnPlayer();
         revealArea(lat,lng);
-        // Обновляем тултипы монстров с расстоянием
+        // Обновляем расстояния в тултипах монстров
         for(let m of monsters){
-            const dist=Math.floor(distance(lat,lng,m.lat,m.lng));
-            m.marker.bindTooltip(`🩸 ${m.hp} HP | ${dist}м`, {permanent:false, direction:'top'});
+            const dist = Math.floor(distance(lat,lng,m.lat,m.lng));
+            m.marker.bindTooltip(`🩸 ${m.hp} HP | ${dist}м`, {permanent: false, direction:'top'});
         }
     }
     function onLocation(pos){
@@ -497,7 +541,7 @@
         );
     }
     
-    // ---- ИНИЦИАЛИЗАЦИЯ ----
+    // ---- ЗАПУСК ----
     window.onload=()=>{
         initMap();
         startGPS();
@@ -510,8 +554,11 @@
             if(currentLocation) for(let i=0;i<3;i++) spawnMonsterNear(currentLocation.lat,currentLocation.lng);
             else { addMonster(55.751244,37.618423,'zombie'); addMonster(55.7515,37.6188,'skeleton_melee'); }
         },2000);
-        setInterval(()=>updateMinion(), 800);
-        // Нет авторегенерации!
+        setInterval(()=>{
+            updateMonstersMovement();
+            updateMinion();
+        }, 800);
+        // нет авторегенерации
     };
 </script>
 </body>
