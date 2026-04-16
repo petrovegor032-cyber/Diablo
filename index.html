@@ -235,6 +235,7 @@
 <script>
     // ============================================================
     //  GEO-DIABLO 3: ЧИСТОВАЯ ВЕРСИЯ
+    //  - Орбы без чёрных полос (clip-path)
     //  - GPS статус в верхней панели (нижний блок удалён)
     // ============================================================
     
@@ -396,7 +397,7 @@
         addMonster(newLat,newLng,type);
     }
     
-    // GPS (убраны все ссылки на gpsLed, так как нижний блок удалён)
+    // GPS
     function updatePlayerOnMap(lat,lng,acc){
         if(playerMarker) map.removeLayer(playerMarker);
         if(accuracyCircle) map.removeLayer(accuracyCircle);
