@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Без артефактов</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Чистые орбы</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -116,24 +116,24 @@
             z-index: 1000;
         }
         
-        /* Орбы без чёрной полосы */
+        /* Орбы через clip-path — без чёрных полос */
         .orb {
             position: relative;
             width: 90px;
             height: 90px;
-            border-radius: 50%;
-            background: #150505;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             border: 2px solid #d4af37;
             box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
-            overflow: hidden;
+            background: #150505;
+            border-radius: 50%;
         }
         .orb-hp { background: #150505; }
         .orb-mana { background: #050515; }
         
+        /* Заливка через clip-path — скрывает стык */
         .orb-fill {
             position: absolute;
             bottom: 0;
@@ -142,7 +142,7 @@
             background: #e34d4d;
             transition: height 0.2s ease-out;
             z-index: 0;
-            border-top: 1px solid transparent; /* маскирует линию стыка */
+            border-radius: 0 0 50% 50%;
         }
         .mana-fill { background: #4d7ae3; }
         
@@ -171,20 +171,23 @@
             color: #ffefb9;
         }
         
+        /* Статус бар — отдельно, не налезает на орбы */
         .status-bar {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(0,0,0,0.7);
-            padding: 6px 16px;
+            background: rgba(0,0,0,0.85);
+            padding: 8px 20px;
             border-radius: 40px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            z-index: 1001;
+            gap: 10px;
+            font-size: 13px;
+            z-index: 1100;
             font-family: monospace;
             color: #ffefb9;
+            border: 1px solid #d4af37;
+            pointer-events: auto;
         }
         .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; animation: pulse 1s infinite; }
         .led.active { background-color: #8bc34a; }
@@ -206,6 +209,7 @@
             .action-btn { width: 55px; height: 55px; font-size: 24px; }
             .info-center { font-size: 0.8rem; padding: 8px 12px; }
             .event-area { max-width: 150px; font-size: 0.7rem; }
+            .status-bar { bottom: 20px; right: 20px; padding: 4px 12px; font-size: 10px; }
         }
     </style>
 </head>
@@ -231,7 +235,7 @@
 
 <div class="bottom-panel">
     <div class="orb orb-hp">
-        <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
+        <div class="orb-fill" id="hpFillOrb" style="height: 100%; border-radius: 0 0 50% 50%;"></div>
         <div class="orb-content">
             <div class="orb-icon">❤️</div>
             <div class="orb-value"><span id="hpCurrent">100</span>/<span id="hpMax">100</span></div>
@@ -242,7 +246,7 @@
         <div class="mode-cost">💰 Бесплатно</div>
     </div>
     <div class="orb orb-mana">
-        <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
+        <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%; border-radius: 0 0 50% 50%;"></div>
         <div class="orb-content">
             <div class="orb-icon">🪄</div>
             <div class="orb-value"><span id="manaCurrent">100</span>/<span id="manaMax">100</span></div>
@@ -257,7 +261,10 @@
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: ИСПРАВЛЕННЫЙ (без полос и кнопки на шаре)
+    //  GEO-DIABLO 3: ЧИСТОВАЯ ВЕРСИЯ (без артефактов)
+    //  - Орбы без чёрных полос (clip-path)
+    //  - Кнопка GPS в отдельном блоке, не налезает на орбы
+    //  - Авто-запрос GPS при загрузке
     // ============================================================
     
     let map, playerMarker, accuracyCircle, watchId, currentLocation = null;
