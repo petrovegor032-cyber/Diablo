@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | 3D орбы + огненный шар + звуки</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Стеклянные шары + градиент</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -125,7 +125,7 @@
             z-index: 2000;
         }
         
-        /* 3D ОРБЫ — с объёмом, свечением, без текста */
+        /* 3D ОРБЫ — стеклянный эффект + градиентная заливка */
         .orb {
             position: relative;
             width: 90px;
@@ -140,20 +140,50 @@
             background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a);
         }
         
+        /* Стеклянный блик */
+        .orb::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 15%;
+            width: 30%;
+            height: 25%;
+            background: radial-gradient(circle, rgba(255,255,255,0.5), rgba(255,255,255,0));
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 3;
+        }
+        
+        /* Градиентная заливка (светлее снизу, темнее сверху) */
         .orb-fill {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
-            background: #e34d4d;
+            background: linear-gradient(to top, #ff6666, #cc3333);
             transition: height 0.2s ease-out;
             border-radius: 0;
         }
-        .mana-fill { background: #4d7ae3; }
+        .mana-fill {
+            background: linear-gradient(to top, #6699ff, #3355cc);
+        }
         
         /* Скрываем текст в шарах */
         .orb-content {
             display: none;
+        }
+        
+        /* Падающая тень под шарами */
+        .orb-shadow {
+            position: absolute;
+            bottom: -10px;
+            left: 10%;
+            width: 80%;
+            height: 15px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 50%;
+            filter: blur(5px);
+            z-index: -1;
         }
         
         .info-center {
@@ -238,6 +268,7 @@
 <div class="bottom-panel">
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
+        <div class="orb-shadow"></div>
     </div>
     <div class="info-center" id="infoCenter">
         <div class="mode-name">⚔️ Режим: Удар</div>
@@ -245,12 +276,13 @@
     </div>
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
+        <div class="orb-shadow"></div>
     </div>
 </div>
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: 3D ОРБЫ + ОГНЕННЫЙ ШАР + ЗВУКИ
+    //  GEO-DIABLO 3: СТЕКЛЯННЫЕ ШАРЫ + ГРАДИЕНТ + РАССТОЯНИЕ ПОДБОРА
     // ============================================================
     
     let map;
@@ -282,6 +314,7 @@
     const SPAWN_RADIUS = 70;
     const MIN_SPAWN_DIST = 30;
     const FIREBALL_RANGE = 50;
+    const COLLECT_RADIUS = 8;  // ← УМЕНЬШЕНО: 8 метров для подбора предметов
     
     // Звуки (Web Audio)
     let audioEnabled = false;
@@ -295,7 +328,6 @@
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             const ctx = new AudioContext();
             
-            // Звук удара
             const hitBuffer = ctx.createBuffer(1, 8000, 44100);
             const hitData = hitBuffer.getChannelData(0);
             for (let i = 0; i < 8000; i++) {
@@ -304,7 +336,6 @@
                 hitData[i] = (Math.sin(2 * Math.PI * 300 * t) + (Math.random() - 0.5) * 0.3) * env * 0.3;
             }
             
-            // Звук огненного шара
             const fireBuffer = ctx.createBuffer(1, 12000, 44100);
             const fireData = fireBuffer.getChannelData(0);
             for (let i = 0; i < 12000; i++) {
@@ -313,7 +344,6 @@
                 fireData[i] = (Math.sin(2 * Math.PI * 200 * t) + Math.sin(2 * Math.PI * 400 * t) * 0.5) * env * 0.4;
             }
             
-            // Звук сбора лута
             const collectBuffer = ctx.createBuffer(1, 4000, 44100);
             const collectData = collectBuffer.getChannelData(0);
             for (let i = 0; i < 4000; i++) {
@@ -322,36 +352,9 @@
                 collectData[i] = Math.sin(2 * Math.PI * 800 * t) * env * 0.2;
             }
             
-            hitSound = {
-                play: () => {
-                    const newCtx = new AudioContext();
-                    const source = newCtx.createBufferSource();
-                    source.buffer = hitBuffer;
-                    source.connect(newCtx.destination);
-                    source.start();
-                    newCtx.resume();
-                }
-            };
-            fireballSound = {
-                play: () => {
-                    const newCtx = new AudioContext();
-                    const source = newCtx.createBufferSource();
-                    source.buffer = fireBuffer;
-                    source.connect(newCtx.destination);
-                    source.start();
-                    newCtx.resume();
-                }
-            };
-            collectSound = {
-                play: () => {
-                    const newCtx = new AudioContext();
-                    const source = newCtx.createBufferSource();
-                    source.buffer = collectBuffer;
-                    source.connect(newCtx.destination);
-                    source.start();
-                    newCtx.resume();
-                }
-            };
+            hitSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = hitBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            fireballSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = fireBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            collectSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = collectBuffer; s.connect(c.destination); s.start(); c.resume(); } };
             audioEnabled = true;
         } catch(e) { console.log("Audio not supported"); }
     }
@@ -368,7 +371,6 @@
         }, 3000);
     }
     
-    // Анимация огненного шара
     function animateFireball(fromX, fromY, toX, toY, onComplete) {
         const fireball = document.createElement('div');
         fireball.className = 'fireball-animation';
@@ -383,24 +385,16 @@
             if (!start) start = timestamp;
             const elapsed = timestamp - start;
             const progress = Math.min(1, elapsed / duration);
-            
             const currentX = fromX + (toX - fromX) * progress;
             const currentY = fromY + (toY - fromY) * progress;
             fireball.style.left = currentX + 'px';
             fireball.style.top = currentY + 'px';
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                fireball.remove();
-                if (onComplete) onComplete();
-            }
+            if (progress < 1) requestAnimationFrame(animate);
+            else { fireball.remove(); if (onComplete) onComplete(); }
         }
-        
         requestAnimationFrame(animate);
     }
     
-    // Туман войны
     function initFog() {
         const canvas = document.getElementById('fogCanvas');
         const ctx = canvas.getContext('2d');
@@ -467,7 +461,7 @@
                 return;
             }
             for (let obj of interactives) {
-                if (distance(clickedLat, clickedLng, obj.lat, obj.lng) < 15) {
+                if (distance(clickedLat, clickedLng, obj.lat, obj.lng) < COLLECT_RADIUS) {
                     collectInteractive(obj);
                     break;
                 }
@@ -524,7 +518,6 @@
         const meleeBtn = document.getElementById('meleeBtn');
         const fireBtn = document.getElementById('fireballBtn');
         const infoCenter = document.getElementById('infoCenter');
-        
         if (mode === 'melee') {
             meleeBtn.classList.add('active');
             fireBtn.classList.remove('active');
@@ -566,7 +559,6 @@
         player.mana -= 30;
         updateUI();
         
-        // Анимация огненного шара
         const fromPoint = map.latLngToContainerPoint([currentLocation.lat, currentLocation.lng]);
         const toPoint = map.latLngToContainerPoint([monster.lat, monster.lng]);
         
@@ -721,7 +713,6 @@
         setActiveMode('melee');
         updateUI();
         
-        // Инициализация звука по первому касанию
         const enableAudio = () => {
             initAudio();
             document.removeEventListener('touchstart', enableAudio);
