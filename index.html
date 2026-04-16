@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Финальная версия</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | 3D орбы + огненный шар + звуки</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -20,7 +20,7 @@
             z-index: 2;
         }
         
-        /* Верхняя панель: статистика + события + GPS */
+        /* Верхняя панель */
         .top-stats {
             position: fixed;
             top: 12px;
@@ -69,7 +69,7 @@
             text-overflow: ellipsis;
         }
         
-        /* Правый столбик: кнопки атаки */
+        /* Кнопки атаки справа */
         .action-sidebar {
             position: fixed;
             right: 12px;
@@ -109,10 +109,10 @@
             box-shadow: 0 0 15px gold;
             transform: scale(1.02);
         }
-        .melee-btn { background: #5a3a1a; border-bottom: 3px solid #b87a2a; }
-        .fireball-btn { background: #6a2a1a; border-bottom: 3px solid #e34d4d; }
+        .melee-btn { background: #5a3a1a; }
+        .fireball-btn { background: #6a2a1a; }
         
-        /* Нижняя панель: красный шар слева, синий справа, информация между ними */
+        /* Нижняя панель */
         .bottom-panel {
             position: fixed;
             bottom: 20px;
@@ -122,29 +122,24 @@
             justify-content: space-between;
             align-items: flex-end;
             gap: 20px;
-            z-index: 1000;
+            z-index: 2000;
         }
+        
+        /* 3D ОРБЫ — с объёмом, свечением, без текста */
         .orb {
             position: relative;
             width: 90px;
             height: 90px;
             border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             border: 2px solid #d4af37;
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2);
-            animation: orbPulse 2s infinite ease-in-out;
             overflow: hidden;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 -15px 20px rgba(0,0,0,0.6), inset 0 15px 20px rgba(255,255,255,0.15);
+            background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000);
         }
-        @keyframes orbPulse {
-            0% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
-            50% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.7), inset 0 0 15px rgba(255,255,255,0.3); }
-            100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(255,255,255,0.2); }
+        .orb-mana {
+            background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a);
         }
-        .orb-hp { background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000); }
-        .orb-mana { background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a); }
+        
         .orb-fill {
             position: absolute;
             bottom: 0;
@@ -152,20 +147,15 @@
             width: 100%;
             background: #e34d4d;
             transition: height 0.2s ease-out;
-            z-index: 0;
+            border-radius: 0;
         }
         .mana-fill { background: #4d7ae3; }
-        .orb-content {
-            position: relative;
-            z-index: 2;
-            text-align: center;
-            font-weight: bold;
-            text-shadow: 0 0 5px black;
-        }
-        .orb-icon { font-size: 28px; filter: drop-shadow(0 0 4px gold); }
-        .orb-value { font-size: 13px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
         
-        /* Центральная информационная панель между шарами */
+        /* Скрываем текст в шарах */
+        .orb-content {
+            display: none;
+        }
+        
         .info-center {
             flex: 1;
             background: rgba(0,0,0,0.85);
@@ -183,6 +173,20 @@
         .info-center .mode-name { font-size: 1.2rem; margin-bottom: 4px; }
         .info-center .mode-cost { font-size: 0.8rem; color: #ffcc66; }
         
+        /* Анимация огненного шара */
+        .fireball-animation {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #ff6600, #ff3300);
+            border-radius: 50%;
+            box-shadow: 0 0 20px #ff6600, 0 0 40px #ff3300;
+            pointer-events: none;
+            z-index: 10000;
+            transition: all 0.05s linear;
+            filter: blur(2px);
+        }
+        
         .hit-effect {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -199,11 +203,8 @@
         
         @media (max-width: 700px) {
             .orb { width: 65px; height: 65px; }
-            .orb-icon { font-size: 22px; }
-            .orb-value { font-size: 10px; }
             .action-btn { width: 55px; height: 55px; font-size: 24px; }
             .info-center { font-size: 0.8rem; padding: 8px 12px; }
-            .info-center .mode-name { font-size: 1rem; }
             .stats-left { gap: 8px; }
             .stat-item { padding: 2px 10px; font-size: 0.7rem; }
             .event-area { max-width: 150px; font-size: 0.7rem; }
@@ -215,7 +216,6 @@
 <div id="map"></div>
 <canvas id="fogCanvas"></canvas>
 
-<!-- Верхняя панель: статистика + события + GPS -->
 <div class="top-stats">
     <div class="stats-left">
         <div class="stat-item">🧙‍♀️ Ур. <span id="lvl">1</span></div>
@@ -230,47 +230,27 @@
     <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
 </div>
 
-<!-- Правый столбик: кнопки атаки -->
 <div class="action-sidebar">
     <button id="meleeBtn" class="action-btn melee-btn active">⚔️<span>Удар</span></button>
     <button id="fireballBtn" class="action-btn fireball-btn">🔥<span>Огонь</span></button>
 </div>
 
-<!-- Нижняя панель: красный шар (слева) + информация (центр) + синий шар (справа) -->
 <div class="bottom-panel">
-    <!-- Красный шар (жизнь) слева -->
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
-        <div class="orb-content">
-            <div class="orb-icon">❤️</div>
-            <div class="orb-value"><span id="hpCurrent">100</span>/<span id="hpMax">100</span></div>
-        </div>
     </div>
-    
-    <!-- Центральная информационная панель -->
     <div class="info-center" id="infoCenter">
         <div class="mode-name">⚔️ Режим: Удар</div>
         <div class="mode-cost">💰 Бесплатно</div>
     </div>
-    
-    <!-- Синий шар (мана) справа -->
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
-        <div class="orb-content">
-            <div class="orb-icon">🪄</div>
-            <div class="orb-value"><span id="manaCurrent">100</span>/<span id="manaMax">100</span></div>
-        </div>
     </div>
 </div>
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: ФИНАЛ
-    //  - Красный шар слева, синий справа, информация между ними
-    //  - Огонь летит на 50 метров
-    //  - Все события в верхней панели
-    //  - GPS вверху, счётчик ресурсов добавлен
-    //  - НИЖНИЙ БЛОК STATUS-BAR УДАЛЁН
+    //  GEO-DIABLO 3: 3D ОРБЫ + ОГНЕННЫЙ ШАР + ЗВУКИ
     // ============================================================
     
     let map;
@@ -279,7 +259,6 @@
     let watchId = null;
     let currentLocation = null;
     
-    // Туман войны
     let revealedCircles = [];
     const FOG_RADIUS = 70;
     
@@ -304,6 +283,79 @@
     const MIN_SPAWN_DIST = 30;
     const FIREBALL_RANGE = 50;
     
+    // Звуки (Web Audio)
+    let audioEnabled = false;
+    let hitSound = null;
+    let fireballSound = null;
+    let collectSound = null;
+    
+    function initAudio() {
+        if (audioEnabled) return;
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioContext();
+            
+            // Звук удара
+            const hitBuffer = ctx.createBuffer(1, 8000, 44100);
+            const hitData = hitBuffer.getChannelData(0);
+            for (let i = 0; i < 8000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 30);
+                hitData[i] = (Math.sin(2 * Math.PI * 300 * t) + (Math.random() - 0.5) * 0.3) * env * 0.3;
+            }
+            
+            // Звук огненного шара
+            const fireBuffer = ctx.createBuffer(1, 12000, 44100);
+            const fireData = fireBuffer.getChannelData(0);
+            for (let i = 0; i < 12000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 15);
+                fireData[i] = (Math.sin(2 * Math.PI * 200 * t) + Math.sin(2 * Math.PI * 400 * t) * 0.5) * env * 0.4;
+            }
+            
+            // Звук сбора лута
+            const collectBuffer = ctx.createBuffer(1, 4000, 44100);
+            const collectData = collectBuffer.getChannelData(0);
+            for (let i = 0; i < 4000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 20);
+                collectData[i] = Math.sin(2 * Math.PI * 800 * t) * env * 0.2;
+            }
+            
+            hitSound = {
+                play: () => {
+                    const newCtx = new AudioContext();
+                    const source = newCtx.createBufferSource();
+                    source.buffer = hitBuffer;
+                    source.connect(newCtx.destination);
+                    source.start();
+                    newCtx.resume();
+                }
+            };
+            fireballSound = {
+                play: () => {
+                    const newCtx = new AudioContext();
+                    const source = newCtx.createBufferSource();
+                    source.buffer = fireBuffer;
+                    source.connect(newCtx.destination);
+                    source.start();
+                    newCtx.resume();
+                }
+            };
+            collectSound = {
+                play: () => {
+                    const newCtx = new AudioContext();
+                    const source = newCtx.createBufferSource();
+                    source.buffer = collectBuffer;
+                    source.connect(newCtx.destination);
+                    source.start();
+                    newCtx.resume();
+                }
+            };
+            audioEnabled = true;
+        } catch(e) { console.log("Audio not supported"); }
+    }
+    
     function showEventMessage(msg, isError = false) {
         const eventDiv = document.getElementById('eventMessage');
         eventDiv.innerHTML = msg;
@@ -316,9 +368,39 @@
         }, 3000);
     }
     
-    // ----------------------------------------------------------
-    // ТУМАН ВОЙНЫ
-    // ----------------------------------------------------------
+    // Анимация огненного шара
+    function animateFireball(fromX, fromY, toX, toY, onComplete) {
+        const fireball = document.createElement('div');
+        fireball.className = 'fireball-animation';
+        document.body.appendChild(fireball);
+        fireball.style.left = fromX + 'px';
+        fireball.style.top = fromY + 'px';
+        
+        let start = null;
+        const duration = 300;
+        
+        function animate(timestamp) {
+            if (!start) start = timestamp;
+            const elapsed = timestamp - start;
+            const progress = Math.min(1, elapsed / duration);
+            
+            const currentX = fromX + (toX - fromX) * progress;
+            const currentY = fromY + (toY - fromY) * progress;
+            fireball.style.left = currentX + 'px';
+            fireball.style.top = currentY + 'px';
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                fireball.remove();
+                if (onComplete) onComplete();
+            }
+        }
+        
+        requestAnimationFrame(animate);
+    }
+    
+    // Туман войны
     function initFog() {
         const canvas = document.getElementById('fogCanvas');
         const ctx = canvas.getContext('2d');
@@ -361,9 +443,6 @@
         if (window.drawFog) window.drawFog();
     }
     
-    // ----------------------------------------------------------
-    // КАРТА + АВТОЦЕНТР
-    // ----------------------------------------------------------
     function initMap() {
         map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -400,9 +479,6 @@
         if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
     }
     
-    // ----------------------------------------------------------
-    // ИКОНКИ
-    // ----------------------------------------------------------
     function getPlayerIcon() {
         return L.divIcon({
             html: `<div style="background:#2c6e2c; width:34px; height:34px; border-radius:50%; border:3px solid #ffd966; display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 12px gold;">🧙‍♀️</div>`,
@@ -430,18 +506,11 @@
         });
     }
     
-    // ----------------------------------------------------------
-    // UI
-    // ----------------------------------------------------------
     function updateUI() {
         document.getElementById('lvl').innerText = player.lvl;
-        document.getElementById('hpCurrent').innerText = Math.max(0, player.hp);
-        document.getElementById('hpMax').innerText = player.maxHp;
-        document.getElementById('manaCurrent').innerText = Math.floor(player.mana);
-        document.getElementById('manaMax').innerText = player.maxMana;
-        document.getElementById('gold').innerText = player.gold;
         document.getElementById('xp').innerText = player.xp;
         document.getElementById('xpNext').innerText = player.lvl * 100;
+        document.getElementById('gold').innerText = player.gold;
         document.getElementById('resources').innerText = player.resources;
         
         const hpPercent = (player.hp / player.maxHp * 100);
@@ -477,15 +546,13 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
     
-    // ----------------------------------------------------------
-    // АТАКИ
-    // ----------------------------------------------------------
     function meleeAttack(monster) {
         if (!currentLocation) return;
         const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
         if (dist > 15) { showEventMessage(`❌ Далеко (${Math.floor(dist)}м)`, true); return; }
         monster.hp -= 25;
-        showEventMessage(`⚔️ Удар! ${monster.hp} ❤️ осталось`);
+        showEventMessage(`⚔️ Удар! ${monster.hp} ❤️`);
+        if (audioEnabled && hitSound) hitSound.play();
         if (monster.hp <= 0) killMonster(monster);
         hitFlash();
     }
@@ -494,13 +561,23 @@
         if (player.mana < 30) { showEventMessage('❌ Нет маны', true); return; }
         if (!currentLocation) return;
         const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
-        if (dist > FIREBALL_RANGE) { showEventMessage(`❌ Далеко (${Math.floor(dist)}м > ${FIREBALL_RANGE}м)`, true); return; }
+        if (dist > FIREBALL_RANGE) { showEventMessage(`❌ Далеко (${Math.floor(dist)}м)`, true); return; }
+        
         player.mana -= 30;
-        monster.hp -= 45;
         updateUI();
-        showEventMessage(`🔥 Огонь! ${monster.hp} ❤️ осталось`);
-        if (monster.hp <= 0) killMonster(monster);
-        hitFlash();
+        
+        // Анимация огненного шара
+        const fromPoint = map.latLngToContainerPoint([currentLocation.lat, currentLocation.lng]);
+        const toPoint = map.latLngToContainerPoint([monster.lat, monster.lng]);
+        
+        animateFireball(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y, () => {
+            monster.hp -= 45;
+            showEventMessage(`🔥 Огонь! ${monster.hp} ❤️`);
+            if (audioEnabled && fireballSound) fireballSound.play();
+            if (monster.hp <= 0) killMonster(monster);
+            hitFlash();
+        });
+        
         setTimeout(() => { if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 5); updateUI(); } }, 1000);
     }
     
@@ -532,9 +609,6 @@
         setTimeout(() => flash.remove(), 200);
     }
     
-    // ----------------------------------------------------------
-    // МИР
-    // ----------------------------------------------------------
     function addInteractive(lat, lng, type) {
         const id = nextId++;
         const marker = L.marker([lat, lng], { icon: getInteractiveIcon(type) }).addTo(map);
@@ -555,6 +629,7 @@
         const idx = interactives.findIndex(i => i.id === obj.id);
         if (idx !== -1) interactives.splice(idx, 1);
         showEventMessage(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
+        if (audioEnabled && collectSound) collectSound.play();
     }
     
     function addMonster(lat, lng, type) {
@@ -590,9 +665,6 @@
         addMonster(newLat, newLng, type);
     }
     
-    // ----------------------------------------------------------
-    // GPS + АВТОЦЕНТР + ТУМАН
-    // ----------------------------------------------------------
     function updatePlayerOnMap(lat, lng, accuracy) {
         if (playerMarker) map.removeLayer(playerMarker);
         if (accuracyCircle) map.removeLayer(accuracyCircle);
@@ -641,9 +713,6 @@
         );
     }
     
-    // ----------------------------------------------------------
-    // ЗАПУСК
-    // ----------------------------------------------------------
     window.onload = () => {
         initMap();
         startGPS();
@@ -651,6 +720,16 @@
         document.getElementById('fireballBtn').onclick = () => setActiveMode('fireball');
         setActiveMode('melee');
         updateUI();
+        
+        // Инициализация звука по первому касанию
+        const enableAudio = () => {
+            initAudio();
+            document.removeEventListener('touchstart', enableAudio);
+            document.removeEventListener('click', enableAudio);
+        };
+        document.addEventListener('touchstart', enableAudio);
+        document.addEventListener('click', enableAudio);
+        
         setTimeout(() => {
             if (currentLocation) for (let i = 0; i < 3; i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
             else { addMonster(55.751244, 37.618423, 'zombie'); addMonster(55.7515, 37.6188, 'skeleton_melee'); }
