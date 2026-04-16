@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Стеклянные шары + градиент</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Зелья + Алтари + Без регенерации</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -112,7 +112,7 @@
         .melee-btn { background: #5a3a1a; }
         .fireball-btn { background: #6a2a1a; }
         
-        /* Нижняя панель */
+        /* Нижняя панель с орбами */
         .bottom-panel {
             position: fixed;
             bottom: 20px;
@@ -125,7 +125,7 @@
             z-index: 2000;
         }
         
-        /* 3D ОРБЫ — стеклянный эффект + градиентная заливка */
+        /* 3D ОРБЫ */
         .orb {
             position: relative;
             width: 90px;
@@ -139,8 +139,6 @@
         .orb-mana {
             background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a);
         }
-        
-        /* Стеклянный блик */
         .orb::after {
             content: '';
             position: absolute;
@@ -153,8 +151,6 @@
             pointer-events: none;
             z-index: 3;
         }
-        
-        /* Градиентная заливка (светлее снизу, темнее сверху) */
         .orb-fill {
             position: absolute;
             bottom: 0;
@@ -167,23 +163,8 @@
         .mana-fill {
             background: linear-gradient(to top, #6699ff, #3355cc);
         }
-        
-        /* Скрываем текст в шарах */
         .orb-content {
             display: none;
-        }
-        
-        /* Падающая тень под шарами */
-        .orb-shadow {
-            position: absolute;
-            bottom: -10px;
-            left: 10%;
-            width: 80%;
-            height: 15px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 50%;
-            filter: blur(5px);
-            z-index: -1;
         }
         
         .info-center {
@@ -203,7 +184,52 @@
         .info-center .mode-name { font-size: 1.2rem; margin-bottom: 4px; }
         .info-center .mode-cost { font-size: 0.8rem; color: #ffcc66; }
         
-        /* Анимация огненного шара */
+        /* ПАНЕЛЬ ЗЕЛИЙ (красное зелье) */
+        .potion-bar {
+            position: fixed;
+            bottom: 130px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            padding: 8px 20px;
+            border-radius: 60px;
+            z-index: 1000;
+            border: 1px solid #d4af37;
+        }
+        .potion-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #1a0a0a;
+            border: 2px solid #d4af37;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.1s;
+            font-size: 24px;
+            position: relative;
+        }
+        .potion-btn:active { transform: scale(0.95); }
+        .potion-count {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #1a1a1a;
+            color: #ffcc66;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 20px;
+            border: 1px solid #d4af37;
+        }
+        .hp-potion { background: #8b0000; box-shadow: 0 0 10px #ff4444; }
+        .mana-potion { background: #00008b; box-shadow: 0 0 10px #4444ff; }
+        
         .fireball-animation {
             position: fixed;
             width: 40px;
@@ -238,6 +264,8 @@
             .stats-left { gap: 8px; }
             .stat-item { padding: 2px 10px; font-size: 0.7rem; }
             .event-area { max-width: 150px; font-size: 0.7rem; }
+            .potion-btn { width: 50px; height: 50px; font-size: 20px; }
+            .potion-bar { bottom: 110px; gap: 10px; padding: 6px 15px; }
         }
     </style>
 </head>
@@ -268,7 +296,6 @@
 <div class="bottom-panel">
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
-        <div class="orb-shadow"></div>
     </div>
     <div class="info-center" id="infoCenter">
         <div class="mode-name">⚔️ Режим: Удар</div>
@@ -276,13 +303,29 @@
     </div>
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
-        <div class="orb-shadow"></div>
+    </div>
+</div>
+
+<!-- Панель зелий -->
+<div class="potion-bar">
+    <div class="potion-btn hp-potion" id="hpPotionBtn">
+        🧪
+        <span class="potion-count" id="hpPotionCount">3</span>
+    </div>
+    <div class="potion-btn mana-potion" id="manaPotionBtn">
+        💧
+        <span class="potion-count" id="manaPotionCount">2</span>
     </div>
 </div>
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: СТЕКЛЯННЫЕ ШАРЫ + ГРАДИЕНТ + РАССТОЯНИЕ ПОДБОРА
+    //  GEO-DIABLO 3: ЗЕЛЬЯ + АЛТАРИ + БЕЗ РЕГЕНЕРАЦИИ
+    //  - Зум 15 (карта видна хорошо)
+    //  - Красное зелье лечения (+50 HP)
+    //  - Синее зелье маны (+30 MP)
+    //  - Алтари восстанавливают всё
+    //  - НЕТ авторегенерации
     // ============================================================
     
     let map;
@@ -302,7 +345,9 @@
         maxMana: 100,
         xp: 0,
         gold: 0,
-        resources: 0
+        resources: 0,
+        hpPotions: 3,
+        manaPotions: 2
     };
     
     let activeMode = 'melee';
@@ -314,13 +359,14 @@
     const SPAWN_RADIUS = 70;
     const MIN_SPAWN_DIST = 30;
     const FIREBALL_RANGE = 50;
-    const COLLECT_RADIUS = 8;  // ← УМЕНЬШЕНО: 8 метров для подбора предметов
+    const COLLECT_RADIUS = 8;
     
-    // Звуки (Web Audio)
+    // Звуки
     let audioEnabled = false;
     let hitSound = null;
     let fireballSound = null;
     let collectSound = null;
+    let potionSound = null;
     
     function initAudio() {
         if (audioEnabled) return;
@@ -352,9 +398,18 @@
                 collectData[i] = Math.sin(2 * Math.PI * 800 * t) * env * 0.2;
             }
             
+            const potionBuffer = ctx.createBuffer(1, 3000, 44100);
+            const potionData = potionBuffer.getChannelData(0);
+            for (let i = 0; i < 3000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 25);
+                potionData[i] = Math.sin(2 * Math.PI * 600 * t) * env * 0.25;
+            }
+            
             hitSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = hitBuffer; s.connect(c.destination); s.start(); c.resume(); } };
             fireballSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = fireBuffer; s.connect(c.destination); s.start(); c.resume(); } };
             collectSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = collectBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            potionSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = potionBuffer; s.connect(c.destination); s.start(); c.resume(); } };
             audioEnabled = true;
         } catch(e) { console.log("Audio not supported"); }
     }
@@ -371,16 +426,43 @@
         }, 3000);
     }
     
+    function updatePotionUI() {
+        document.getElementById('hpPotionCount').innerText = player.hpPotions;
+        document.getElementById('manaPotionCount').innerText = player.manaPotions;
+    }
+    
+    function useHpPotion() {
+        if (player.hpPotions <= 0) { showEventMessage('❌ Нет зелий лечения!', true); return; }
+        if (player.hp >= player.maxHp) { showEventMessage('❌ Здоровье уже полное', true); return; }
+        player.hp = Math.min(player.maxHp, player.hp + 50);
+        player.hpPotions--;
+        updateUI();
+        updatePotionUI();
+        showEventMessage('🧪 Зелье лечения +50 HP');
+        if (audioEnabled && potionSound) potionSound.play();
+        hitFlash();
+    }
+    
+    function useManaPotion() {
+        if (player.manaPotions <= 0) { showEventMessage('❌ Нет зелий маны!', true); return; }
+        if (player.mana >= player.maxMana) { showEventMessage('❌ Мана уже полная', true); return; }
+        player.mana = Math.min(player.maxMana, player.mana + 30);
+        player.manaPotions--;
+        updateUI();
+        updatePotionUI();
+        showEventMessage('💧 Зелье маны +30 MP');
+        if (audioEnabled && potionSound) potionSound.play();
+        hitFlash();
+    }
+    
     function animateFireball(fromX, fromY, toX, toY, onComplete) {
         const fireball = document.createElement('div');
         fireball.className = 'fireball-animation';
         document.body.appendChild(fireball);
         fireball.style.left = fromX + 'px';
         fireball.style.top = fromY + 'px';
-        
         let start = null;
         const duration = 300;
-        
         function animate(timestamp) {
             if (!start) start = timestamp;
             const elapsed = timestamp - start;
@@ -438,7 +520,7 @@
     }
     
     function initMap() {
-        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 17);
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 15);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OSM',
             subdomains: 'abcd',
@@ -470,7 +552,7 @@
     }
     
     function centerOnPlayer() {
-        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 15);
     }
     
     function getPlayerIcon() {
@@ -569,8 +651,6 @@
             if (monster.hp <= 0) killMonster(monster);
             hitFlash();
         });
-        
-        setTimeout(() => { if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 5); updateUI(); } }, 1000);
     }
     
     function killMonster(monster) {
@@ -578,6 +658,12 @@
         const gainGold = 8 + Math.floor(Math.random() * 12);
         player.xp += gainXp;
         player.gold += gainGold;
+        
+        // Шанс выпадения зелья
+        if (Math.random() < 0.2) player.hpPotions++;
+        if (Math.random() < 0.15) player.manaPotions++;
+        updatePotionUI();
+        
         const xpNeeded = player.lvl * 100;
         if (player.xp >= xpNeeded) {
             player.lvl++;
@@ -607,21 +693,28 @@
         let gold = 0, mana = 0;
         if (type === 'chest') { gold = 20 + Math.floor(Math.random() * 40); mana = 10; }
         if (type === 'barrel') gold = 5 + Math.floor(Math.random() * 10);
-        if (type === 'altar') mana = 15;
+        if (type === 'altar') { mana = 15; }
         interactives.push({ id, lat, lng, type, gold, mana, marker });
     }
     
     function collectInteractive(obj) {
-        player.gold += obj.gold;
-        player.mana = Math.min(player.maxMana, player.mana + obj.mana);
-        if (obj.type === 'altar') player.maxMana += 10;
-        player.resources++;
+        if (obj.type === 'altar') {
+            // Алтарь восстанавливает всё
+            player.hp = player.maxHp;
+            player.mana = player.maxMana;
+            showEventMessage(`🗿 Алтарь восстановил здоровье и ману!`);
+            if (audioEnabled && collectSound) collectSound.play();
+        } else {
+            player.gold += obj.gold;
+            player.mana = Math.min(player.maxMana, player.mana + obj.mana);
+            player.resources++;
+            showEventMessage(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
+            if (audioEnabled && collectSound) collectSound.play();
+        }
         updateUI();
         if (obj.marker) map.removeLayer(obj.marker);
         const idx = interactives.findIndex(i => i.id === obj.id);
         if (idx !== -1) interactives.splice(idx, 1);
-        showEventMessage(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
-        if (audioEnabled && collectSound) collectSound.play();
     }
     
     function addMonster(lat, lng, type) {
@@ -710,8 +803,11 @@
         startGPS();
         document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
         document.getElementById('fireballBtn').onclick = () => setActiveMode('fireball');
+        document.getElementById('hpPotionBtn').onclick = () => useHpPotion();
+        document.getElementById('manaPotionBtn').onclick = () => useManaPotion();
         setActiveMode('melee');
         updateUI();
+        updatePotionUI();
         
         const enableAudio = () => {
             initAudio();
@@ -725,13 +821,8 @@
             if (currentLocation) for (let i = 0; i < 3; i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
             else { addMonster(55.751244, 37.618423, 'zombie'); addMonster(55.7515, 37.6188, 'skeleton_melee'); }
         }, 2000);
-        setInterval(() => {
-            if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 2); updateUI(); }
-            if (player.hp < player.maxHp && monsters.filter(m => distance(currentLocation?.lat, currentLocation?.lng, m.lat, m.lng) < 25).length === 0) {
-                player.hp = Math.min(player.maxHp, player.hp + 1);
-                updateUI();
-            }
-        }, 3000);
+        
+        // НЕТ АВТОРЕГЕНЕРАЦИИ!
     };
 </script>
 </body>
