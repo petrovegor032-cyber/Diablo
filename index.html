@@ -3,63 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Волшебница</title>
+    <title>⚔️ Diablo 3 | Гео-RPG | Волшебница | Туман войны</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body, html { height: 100%; font-family: 'Segoe UI', 'Cinema', system-ui, sans-serif; background: #0a0f1a; overflow: hidden; }
+        body, html { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0f1a; overflow: hidden; }
         #map { height: 100%; width: 100%; z-index: 1; }
+        #fogCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
         
-        /* Diablo 3 Style HUD */
+        /* Diablo 3 HUD — ВЕРХНЯЯ ПАНЕЛЬ */
         .diablo-hud {
             position: fixed;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(8px);
-            border-radius: 80px;
-            padding: 12px 20px;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 60px;
+            padding: 8px 16px;
             z-index: 1000;
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            border: 1px solid #7a5a3a;
-            box-shadow: 0 0 15px rgba(0,0,0,0.6);
-            font-family: 'Cinema', monospace;
+            gap: 10px;
+            border: 1px solid #d4af37;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            font-family: monospace;
         }
         
-        /* Орбы жизни и маны (Diablo 3 style) */
+        /* Орбы (уменьшенные для верха) */
         .orbs {
             display: flex;
-            gap: 12px;
+            gap: 8px;
             background: rgba(0,0,0,0.5);
-            padding: 5px 15px;
-            border-radius: 60px;
-            align-items: center;
+            padding: 4px 12px;
+            border-radius: 50px;
         }
         .orb {
             position: relative;
-            width: 70px;
-            height: 70px;
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
             background: radial-gradient(circle at 30% 30%, #2a0000, #1a0000);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 0 8px rgba(0,0,0,0.5), inset 0 0 8px rgba(255,255,255,0.2);
             border: 1px solid #d4af37;
         }
-        .orb-hp {
-            background: radial-gradient(circle at 30% 30%, #3a0a0a, #1a0000);
-        }
-        .orb-mana {
-            background: radial-gradient(circle at 30% 30%, #0a1a3a, #000a1a);
-        }
+        .orb-hp { background: radial-gradient(circle at 30% 30%, #3a0a0a, #1a0000); }
+        .orb-mana { background: radial-gradient(circle at 30% 30%, #0a1a3a, #000a1a); }
         .orb-fill {
             position: absolute;
             bottom: 0;
@@ -70,113 +73,82 @@
             transition: height 0.2s;
             z-index: 0;
         }
-        .orb-fill.mana-fill {
-            background: #4d7ae3;
-        }
+        .mana-fill { background: #4d7ae3; }
         .orb-content {
             position: relative;
             z-index: 2;
             text-align: center;
             font-weight: bold;
-            text-shadow: 0 0 5px black;
-            font-size: 14px;
+            font-size: 10px;
         }
-        .orb-icon {
-            font-size: 24px;
-        }
-        .orb-value {
-            font-size: 16px;
-            font-weight: bold;
-            background: rgba(0,0,0,0.6);
-            padding: 0 6px;
-            border-radius: 20px;
-        }
+        .orb-icon { font-size: 18px; }
+        .orb-value { font-size: 10px; background: rgba(0,0,0,0.6); padding: 0 4px; border-radius: 20px; }
         
         .stats-panel {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             background: #1e1a10;
-            padding: 6px 18px;
+            padding: 4px 16px;
             border-radius: 40px;
             border: 1px solid #d4af37;
         }
-        .stat {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #ffefb9;
-        }
+        .stat { display: flex; align-items: center; gap: 6px; font-size: 1rem; color: #ffefb9; }
         
         .action-buttons {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             background: #1e1a10;
-            padding: 6px 18px;
-            border-radius: 60px;
+            padding: 4px 16px;
+            border-radius: 50px;
             border: 1px solid #d4af37;
         }
         .action-btn {
             background: #3a2a1a;
             border: none;
             color: #ffefb9;
-            padding: 8px 20px;
+            padding: 6px 18px;
             border-radius: 40px;
             font-weight: bold;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             transition: 0.1s;
-            min-width: 100px;
-            font-family: monospace;
-            letter-spacing: 1px;
         }
-        .action-btn.active {
-            background: #d4a017;
-            color: #1a1a2e;
-            box-shadow: 0 0 12px gold;
-            transform: scale(0.97);
-        }
-        .action-btn:active { transform: scale(0.95); }
-        .melee-btn { background: #5a3a1a; border-bottom: 3px solid #b87a2a; }
-        .fireball-btn { background: #6a2a1a; border-bottom: 3px solid #e34d4d; }
+        .action-btn.active { background: #d4a017; color: #1a1a2e; box-shadow: 0 0 8px gold; }
+        .melee-btn { background: #5a3a1a; }
+        .fireball-btn { background: #6a2a1a; }
         
         .status-bar {
             background: #1e1a10;
-            padding: 5px 15px;
+            padding: 4px 12px;
             border-radius: 40px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 11px;
+            gap: 6px;
+            font-size: 10px;
         }
-        .led { width: 12px; height: 12px; border-radius: 50%; background-color: #f80; }
+        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; }
         .led.active { background-color: #8bc34a; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
         
         .mode-indicator {
             position: fixed;
-            top: 70px;
+            top: 80px;
             right: 12px;
             background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(12px);
-            border-radius: 50px;
-            padding: 6px 18px;
+            border-radius: 30px;
+            padding: 4px 12px;
             color: #ffefb9;
             z-index: 1000;
-            font-size: 13px;
-            text-align: center;
+            font-size: 11px;
             border: 1px solid #d4af37;
-            font-weight: bold;
         }
         
-        @media (max-width: 700px) {
-            .diablo-hud { flex-direction: column; align-items: stretch; border-radius: 40px; bottom: 10px; left: 10px; right: 10px; }
+        @media (max-width: 750px) {
+            .diablo-hud { flex-direction: column; align-items: stretch; border-radius: 30px; top: 8px; left: 8px; right: 8px; }
             .orbs { justify-content: center; }
             .action-buttons { justify-content: center; }
-            .orb { width: 55px; height: 55px; }
-            .orb-icon { font-size: 18px; }
-            .orb-value { font-size: 11px; }
+            .stats-panel { justify-content: center; }
+            .mode-indicator { top: 95px; }
         }
         
         .hit-effect {
@@ -188,20 +160,18 @@
             animation: hitFlash 0.2s ease-out;
         }
         @keyframes hitFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
-        
-        .gold-icon { font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
+<canvas id="fogCanvas"></canvas>
 
 <div class="mode-indicator" id="modeIndicator">
     ⚔️ <span id="modeText">Удар</span> | <span id="manaCostInfo">бесплатно</span>
 </div>
 
 <div class="diablo-hud">
-    <!-- Орбы жизни и маны -->
     <div class="orbs">
         <div class="orb orb-hp">
             <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
@@ -219,14 +189,12 @@
         </div>
     </div>
     
-    <!-- Статы -->
     <div class="stats-panel">
         <div class="stat">🧙‍♀️ <span id="lvl">1</span></div>
         <div class="stat">🪙 <span id="gold">0</span></div>
         <div class="stat">✨ <span id="xp">0</span>/<span id="xpNext">100</span></div>
     </div>
     
-    <!-- Кнопки атаки -->
     <div class="action-buttons">
         <button id="meleeBtn" class="action-btn melee-btn active">⚔️ Удар</button>
         <button id="fireballBtn" class="action-btn fireball-btn">🔥 Огонь (30)</button>
@@ -236,15 +204,13 @@
         <span class="led" id="gpsLed"></span>
         <span id="statusText">🌍 Включи GPS</span>
     </div>
-    <button id="centerBtn" style="background:#3a2a1a; border:none; padding:8px 16px; border-radius:40px;">🎯 Центр</button>
 </div>
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: Волшебница, орбы, огонь с 1 уровня
-    //  - Выбор режима (Удар / Огонь), клик по монстру
-    //  - Орбы здоровья и маны (круглые, Diablo style)
-    //  - Волшебница владеет огнём с самого начала
+    //  GEO-DIABLO 3: Туман войны + Автоцентр + Волшебница
+    //  - Панель сверху, карта следует за игроком
+    //  - Туман войны открывается при движении
     // ============================================================
     
     let map;
@@ -252,6 +218,10 @@
     let accuracyCircle = null;
     let watchId = null;
     let currentLocation = null;
+    
+    // Туман войны
+    let revealedCircles = [];
+    const FOG_RADIUS = 70; // метров видимости
     
     let player = {
         lvl: 1,
@@ -263,8 +233,7 @@
         gold: 0
     };
     
-    let activeMode = 'melee';  // 'melee' или 'fireball'
-    
+    let activeMode = 'melee';
     let monsters = [];
     let interactives = [];
     let nextId = 1;
@@ -274,36 +243,76 @@
     const MIN_SPAWN_DIST = 30;
     
     // ----------------------------------------------------------
-    // КАРТА + КЛИК ПО ЦЕЛИ
+    // ТУМАН ВОЙНЫ
+    // ----------------------------------------------------------
+    function initFog() {
+        const canvas = document.getElementById('fogCanvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawFog();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        function drawFog() {
+            if (!map) return;
+            const bounds = map.getBounds();
+            const topLeft = map.latLngToContainerPoint(bounds.getNorthWest());
+            const bottomRight = map.latLngToContainerPoint(bounds.getSouthEast());
+            canvas.width = bottomRight.x - topLeft.x;
+            canvas.height = bottomRight.y - topLeft.y;
+            canvas.style.left = topLeft.x + 'px';
+            canvas.style.top = topLeft.y + 'px';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'destination-out';
+            for (let circ of revealedCircles) {
+                const point = map.latLngToContainerPoint([circ.lat, circ.lng]);
+                const radiusPx = circ.radius / map.getZoomScale(map.getZoom());
+                ctx.beginPath();
+                ctx.arc(point.x - topLeft.x, point.y - topLeft.y, radiusPx, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        map.on('moveend zoomend', drawFog);
+        window.drawFog = drawFog;
+    }
+    
+    function revealArea(lat, lng) {
+        revealedCircles.push({ lat, lng, radius: FOG_RADIUS });
+        if (window.drawFog) window.drawFog();
+    }
+    
+    // ----------------------------------------------------------
+    // КАРТА + АВТОЦЕНТР
     // ----------------------------------------------------------
     function initMap() {
-        map = L.map('map').setView([55.751244, 37.618423], 16);
+        map = L.map('map', { zoomControl: false }).setView([55.751244, 37.618423], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OSM',
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
+        initFog();
         
         map.on('click', (e) => {
             const clickedLat = e.latlng.lat;
             const clickedLng = e.latlng.lng;
-            
             let closestMonster = null;
             let minDist = 20;
             for (let m of monsters) {
                 const dist = distance(clickedLat, clickedLng, m.lat, m.lng);
-                if (dist < minDist) {
-                    minDist = dist;
-                    closestMonster = m;
-                }
+                if (dist < minDist) { minDist = dist; closestMonster = m; }
             }
-            
             if (closestMonster) {
                 if (activeMode === 'melee') meleeAttack(closestMonster);
                 else fireballAttack(closestMonster);
                 return;
             }
-            
             for (let obj of interactives) {
                 if (distance(clickedLat, clickedLng, obj.lat, obj.lng) < 15) {
                     collectInteractive(obj);
@@ -311,6 +320,10 @@
                 }
             }
         });
+    }
+    
+    function centerOnPlayer() {
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
     }
     
     // ----------------------------------------------------------
@@ -355,30 +368,24 @@
         document.getElementById('gold').innerText = player.gold;
         document.getElementById('xp').innerText = player.xp;
         document.getElementById('xpNext').innerText = player.lvl * 100;
-        
-        const hpPercent = (player.hp / player.maxHp) * 100;
-        const manaPercent = (player.mana / player.maxMana) * 100;
-        document.getElementById('hpFillOrb').style.height = hpPercent + '%';
-        document.getElementById('manaFillOrb').style.height = manaPercent + '%';
+        document.getElementById('hpFillOrb').style.height = (player.hp / player.maxHp * 100) + '%';
+        document.getElementById('manaFillOrb').style.height = (player.mana / player.maxMana * 100) + '%';
     }
     
     function setActiveMode(mode) {
         activeMode = mode;
         const meleeBtn = document.getElementById('meleeBtn');
         const fireBtn = document.getElementById('fireballBtn');
-        const modeTextSpan = document.getElementById('modeText');
-        const manaInfo = document.getElementById('manaCostInfo');
-        
         if (mode === 'melee') {
             meleeBtn.classList.add('active');
             fireBtn.classList.remove('active');
-            modeTextSpan.innerText = 'Удар';
-            manaInfo.innerText = 'бесплатно';
+            document.getElementById('modeText').innerText = 'Удар';
+            document.getElementById('manaCostInfo').innerText = 'бесплатно';
         } else {
             fireBtn.classList.add('active');
             meleeBtn.classList.remove('active');
-            modeTextSpan.innerText = 'Огонь';
-            manaInfo.innerText = '30 маны';
+            document.getElementById('modeText').innerText = 'Огонь';
+            document.getElementById('manaCostInfo').innerText = '30 маны';
         }
     }
     
@@ -398,10 +405,7 @@
     function meleeAttack(monster) {
         if (!currentLocation) return;
         const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
-        if (dist > 15) {
-            document.getElementById('statusText').innerHTML = `❌ Далеко (${Math.floor(dist)}м)`;
-            return;
-        }
+        if (dist > 15) { document.getElementById('statusText').innerHTML = `❌ Далеко (${Math.floor(dist)}м)`; return; }
         monster.hp -= 25;
         document.getElementById('statusText').innerHTML = `⚔️ Удар! ${monster.hp} ❤️`;
         if (monster.hp <= 0) killMonster(monster);
@@ -409,29 +413,17 @@
     }
     
     function fireballAttack(monster) {
-        if (player.mana < 30) {
-            document.getElementById('statusText').innerHTML = '❌ Нет маны';
-            return;
-        }
+        if (player.mana < 30) { document.getElementById('statusText').innerHTML = '❌ Нет маны'; return; }
         if (!currentLocation) return;
         const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
-        if (dist > 30) {
-            document.getElementById('statusText').innerHTML = `❌ Далеко (${Math.floor(dist)}м)`;
-            return;
-        }
+        if (dist > 30) { document.getElementById('statusText').innerHTML = `❌ Далеко (${Math.floor(dist)}м)`; return; }
         player.mana -= 30;
         monster.hp -= 45;
         updateUI();
         document.getElementById('statusText').innerHTML = `🔥 Огонь! ${monster.hp} ❤️`;
         if (monster.hp <= 0) killMonster(monster);
         hitFlash();
-        
-        setTimeout(() => {
-            if (player.mana < player.maxMana) {
-                player.mana = Math.min(player.maxMana, player.mana + 5);
-                updateUI();
-            }
-        }, 1000);
+        setTimeout(() => { if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 5); updateUI(); } }, 1000);
     }
     
     function killMonster(monster) {
@@ -439,7 +431,6 @@
         const gainGold = 8 + Math.floor(Math.random() * 12);
         player.xp += gainXp;
         player.gold += gainGold;
-        
         const xpNeeded = player.lvl * 100;
         if (player.xp >= xpNeeded) {
             player.lvl++;
@@ -453,10 +444,7 @@
         updateUI();
         removeMonster(monster.id);
         document.getElementById('statusText').innerHTML = `💀 +${gainXp} XP, +${gainGold} 🪙`;
-        
-        if (Math.random() < 0.3) {
-            addInteractive(monster.lat, monster.lng, Math.random() < 0.7 ? 'barrel' : 'chest');
-        }
+        if (Math.random() < 0.3) addInteractive(monster.lat, monster.lng, Math.random() < 0.7 ? 'barrel' : 'chest');
     }
     
     function hitFlash() {
@@ -467,15 +455,15 @@
     }
     
     // ----------------------------------------------------------
-    // ИНТЕРАКТИВ
+    // МИР
     // ----------------------------------------------------------
     function addInteractive(lat, lng, type) {
         const id = nextId++;
         const marker = L.marker([lat, lng], { icon: getInteractiveIcon(type) }).addTo(map);
         let gold = 0, mana = 0;
         if (type === 'chest') { gold = 20 + Math.floor(Math.random() * 40); mana = 10; }
-        if (type === 'barrel') { gold = 5 + Math.floor(Math.random() * 10); }
-        if (type === 'altar') { gold = 0; mana = 15; }
+        if (type === 'barrel') gold = 5 + Math.floor(Math.random() * 10);
+        if (type === 'altar') mana = 15;
         interactives.push({ id, lat, lng, type, gold, mana, marker });
     }
     
@@ -490,9 +478,6 @@
         document.getElementById('statusText').innerHTML = `📦 +${obj.gold}🪙 +${obj.mana}🪄`;
     }
     
-    // ----------------------------------------------------------
-    // МОНСТРЫ
-    // ----------------------------------------------------------
     function addMonster(lat, lng, type) {
         let hp = 32;
         if (type === 'skeleton_melee') hp = 26;
@@ -527,7 +512,7 @@
     }
     
     // ----------------------------------------------------------
-    // GPS
+    // GPS + АВТОЦЕНТР + ТУМАН
     // ----------------------------------------------------------
     function updatePlayerOnMap(lat, lng, accuracy) {
         if (playerMarker) map.removeLayer(playerMarker);
@@ -538,6 +523,8 @@
         }
         document.getElementById('gpsLed').classList.add('active');
         document.getElementById('statusText').innerHTML = '🔮 Кликай по монстрам!';
+        centerOnPlayer();
+        revealArea(lat, lng);
     }
     
     function onLocation(position) {
@@ -563,39 +550,22 @@
         );
     }
     
-    function centerOnMe() {
-        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
-        else alert("GPS не активен");
-    }
-    
     // ----------------------------------------------------------
     // ЗАПУСК
     // ----------------------------------------------------------
     window.onload = () => {
         initMap();
         startGPS();
-        
         document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
         document.getElementById('fireballBtn').onclick = () => setActiveMode('fireball');
-        document.getElementById('centerBtn').onclick = centerOnMe;
-        
         setActiveMode('melee');
         updateUI();
-        
         setTimeout(() => {
-            if (currentLocation) {
-                for (let i = 0; i < 3; i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
-            } else {
-                addMonster(55.751244, 37.618423, 'zombie');
-                addMonster(55.7515, 37.6188, 'skeleton_melee');
-            }
+            if (currentLocation) for (let i = 0; i < 3; i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
+            else { addMonster(55.751244, 37.618423, 'zombie'); addMonster(55.7515, 37.6188, 'skeleton_melee'); }
         }, 2000);
-        
         setInterval(() => {
-            if (player.mana < player.maxMana) {
-                player.mana = Math.min(player.maxMana, player.mana + 2);
-                updateUI();
-            }
+            if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 2); updateUI(); }
             if (player.hp < player.maxHp && monsters.filter(m => distance(currentLocation?.lat, currentLocation?.lng, m.lat, m.lng) < 25).length === 0) {
                 player.hp = Math.min(player.maxHp, player.hp + 1);
                 updateUI();
