@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Гео-RPG | Чистые орбы</title>
+    <title>⚔️ Diablo 3 | Гео-RPG</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body, html { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0f1a; overflow: hidden; }
+        body, html { height: 100%; font-family: system-ui, monospace; background: #0a0f1a; overflow: hidden; }
         #map { height: 100%; width: 100%; z-index: 1; }
         #fogCanvas {
             position: absolute;
@@ -20,76 +20,99 @@
             z-index: 2;
         }
         
-        /* Верхняя панель */
-        .top-stats {
+        /* Верхняя панель — здесь же статус GPS */
+        .top-panel {
             position: fixed;
-            top: 12px;
-            left: 12px;
-            right: 12px;
+            top: 10px;
+            left: 10px;
+            right: 10px;
             background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(12px);
-            border-radius: 60px;
-            padding: 8px 20px;
+            border-radius: 50px;
+            padding: 8px 15px;
             z-index: 1000;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 1px solid #d4af37;
-            font-family: monospace;
+            font-size: 14px;
             font-weight: bold;
-            font-size: 0.9rem;
             color: #ffefb9;
+            gap: 10px;
+            flex-wrap: wrap;
         }
-        .stats-left { display: flex; gap: 20px; }
-        .stat-item {
+        .stats {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .stat {
+            background: rgba(0,0,0,0.6);
+            padding: 4px 12px;
+            border-radius: 40px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            background: rgba(0,0,0,0.6);
-            padding: 4px 16px;
-            border-radius: 40px;
+            gap: 6px;
         }
-        .event-area {
+        .gps-indicator {
             background: rgba(0,0,0,0.6);
-            padding: 4px 16px;
+            padding: 4px 12px;
             border-radius: 40px;
-            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+        .gps-led {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #f80;
+            animation: blink 1s infinite;
+        }
+        .gps-led.active { background-color: #8bc34a; }
+        @keyframes blink { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        .event {
+            background: rgba(0,0,0,0.6);
+            padding: 4px 12px;
+            border-radius: 40px;
             color: #ffcc66;
-            max-width: 350px;
+            max-width: 300px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-size: 12px;
         }
         
         /* Кнопки атаки справа */
-        .action-sidebar {
+        .actions {
             position: fixed;
             right: 12px;
             top: 50%;
             transform: translateY(-50%);
             background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(12px);
             border-radius: 60px;
-            padding: 16px 12px;
+            padding: 15px 10px;
             z-index: 1000;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 15px;
             border: 1px solid #d4af37;
         }
         .action-btn {
-            width: 70px;
-            height: 70px;
+            width: 65px;
+            height: 65px;
             border-radius: 50%;
+            border: none;
+            font-size: 28px;
             font-weight: bold;
             cursor: pointer;
-            font-size: 28px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            border: none;
+            gap: 3px;
             color: #ffefb9;
             transition: 0.1s;
         }
@@ -100,98 +123,66 @@
             box-shadow: 0 0 15px gold;
             transform: scale(1.02);
         }
-        .melee-btn { background: #5a3a1a; }
-        .fireball-btn { background: #6a2a1a; }
+        .melee { background: #5a3a1a; }
+        .fire { background: #6a2a1a; }
         
-        /* Нижняя панель */
-        .bottom-panel {
+        /* Нижние орбы */
+        .bottom {
             position: fixed;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            gap: 20px;
             z-index: 1000;
+            gap: 15px;
         }
-        
-        /* Орбы через clip-path — без чёрных полос */
         .orb {
-            position: relative;
-            width: 90px;
-            height: 90px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid #d4af37;
+            background: #150505;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            border: 2px solid #d4af37;
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
-            background: #150505;
-            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(212,175,55,0.4);
         }
-        .orb-hp { background: #150505; }
         .orb-mana { background: #050515; }
-        
-        /* Заливка через clip-path — скрывает стык */
         .orb-fill {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
             background: #e34d4d;
-            transition: height 0.2s ease-out;
+            transition: height 0.2s;
             z-index: 0;
             border-radius: 0 0 50% 50%;
         }
-        .mana-fill { background: #4d7ae3; }
-        
+        .orb-fill.mana { background: #4d7ae3; }
         .orb-content {
             position: relative;
             z-index: 2;
             text-align: center;
-            font-weight: bold;
-            text-shadow: 0 0 5px black;
         }
-        .orb-icon { font-size: 28px; filter: drop-shadow(0 0 4px gold); }
-        .orb-value { font-size: 13px; background: rgba(0,0,0,0.7); padding: 2px 8px; border-radius: 20px; margin-top: 5px; }
+        .orb-icon { font-size: 26px; filter: drop-shadow(0 0 2px gold); }
+        .orb-value { font-size: 11px; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 20px; margin-top: 5px; }
         
         .info-center {
             flex: 1;
             background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(12px);
             border-radius: 50px;
-            padding: 12px 20px;
-            margin-bottom: 10px;
-            border: 1px solid #d4af37;
+            padding: 10px;
             text-align: center;
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: #ffefb9;
-        }
-        
-        /* Статус бар — отдельно, не налезает на орбы */
-        .status-bar {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.85);
-            padding: 8px 20px;
-            border-radius: 40px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 13px;
-            z-index: 1100;
-            font-family: monospace;
-            color: #ffefb9;
             border: 1px solid #d4af37;
-            pointer-events: auto;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 8px;
         }
-        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; animation: pulse 1s infinite; }
-        .led.active { background-color: #8bc34a; }
-        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
         
         .hit-effect {
             position: fixed;
@@ -199,17 +190,17 @@
             background: rgba(255,0,0,0.3);
             pointer-events: none;
             z-index: 999;
-            animation: hitFlash 0.2s ease-out;
+            animation: flash 0.2s;
         }
-        @keyframes hitFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
         
-        @media (max-width: 700px) {
+        @media (max-width: 600px) {
             .orb { width: 65px; height: 65px; }
-            .orb-icon { font-size: 22px; }
             .action-btn { width: 55px; height: 55px; font-size: 24px; }
-            .info-center { font-size: 0.8rem; padding: 8px 12px; }
-            .event-area { max-width: 150px; font-size: 0.7rem; }
-            .status-bar { bottom: 20px; right: 20px; padding: 4px 12px; font-size: 10px; }
+            .stat { font-size: 11px; padding: 2px 8px; }
+            .event { font-size: 10px; max-width: 150px; }
+            .info-center { font-size: 10px; }
+            .gps-indicator { font-size: 10px; padding: 2px 8px; }
         }
     </style>
 </head>
@@ -218,70 +209,73 @@
 <div id="map"></div>
 <canvas id="fogCanvas"></canvas>
 
-<div class="top-stats">
-    <div class="stats-left">
-        <div class="stat-item">🧙‍♀️ Ур. <span id="lvl">1</span></div>
-        <div class="stat-item">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
-        <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
-        <div class="stat-item">📦 <span id="resources">0</span></div>
+<!-- Верхняя панель -->
+<div class="top-panel">
+    <div class="stats">
+        <div class="stat">🧙‍♀️ Ур. <span id="lvl">1</span></div>
+        <div class="stat">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
+        <div class="stat">🪙 Золото <span id="gold">0</span></div>
+        <div class="stat">📦 <span id="resources">0</span></div>
+        <div class="gps-indicator" id="gpsIndicator">
+            <span class="gps-led" id="gpsLed"></span>
+            <span id="gpsText">Запрос...</span>
+        </div>
     </div>
-    <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
+    <div class="event" id="eventMsg">🔮 Готов к бою</div>
 </div>
 
-<div class="action-sidebar">
-    <button id="meleeBtn" class="action-btn melee-btn active">⚔️<span>Удар</span></button>
-    <button id="fireballBtn" class="action-btn fireball-btn">🔥<span>Огонь</span></button>
+<!-- Кнопки атаки справа -->
+<div class="actions">
+    <button id="meleeBtn" class="action-btn melee active">⚔️<span>Удар</span></button>
+    <button id="fireBtn" class="action-btn fire">🔥<span>Огонь</span></button>
 </div>
 
-<div class="bottom-panel">
-    <div class="orb orb-hp">
-        <div class="orb-fill" id="hpFillOrb" style="height: 100%; border-radius: 0 0 50% 50%;"></div>
+<!-- Нижняя панель с орбами -->
+<div class="bottom">
+    <div class="orb">
+        <div class="orb-fill" id="hpFill" style="height: 100%;"></div>
         <div class="orb-content">
             <div class="orb-icon">❤️</div>
-            <div class="orb-value"><span id="hpCurrent">100</span>/<span id="hpMax">100</span></div>
+            <div class="orb-value"><span id="hpVal">100</span>/<span id="hpMaxVal">100</span></div>
         </div>
     </div>
-    <div class="info-center" id="infoCenter">
-        <div class="mode-name">⚔️ Режим: Удар</div>
-        <div class="mode-cost">💰 Бесплатно</div>
+    <div class="info-center" id="modeInfo">
+        ⚔️ Режим: Удар (бесплатно)
     </div>
     <div class="orb orb-mana">
-        <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%; border-radius: 0 0 50% 50%;"></div>
+        <div class="orb-fill mana" id="manaFill" style="height: 100%;"></div>
         <div class="orb-content">
             <div class="orb-icon">🪄</div>
-            <div class="orb-value"><span id="manaCurrent">100</span>/<span id="manaMax">100</span></div>
+            <div class="orb-value"><span id="manaVal">100</span>/<span id="manaMaxVal">100</span></div>
         </div>
     </div>
-</div>
-
-<div class="status-bar">
-    <span class="led" id="gpsLed"></span>
-    <span id="statusText">🌍 Запрос GPS...</span>
 </div>
 
 <script>
     // ============================================================
-    //  GEO-DIABLO 3: ЧИСТОВАЯ ВЕРСИЯ (без артефактов)
-    //  - Орбы без чёрных полос (clip-path)
-    //  - Кнопка GPS в отдельном блоке, не налезает на орбы
-    //  - Авто-запрос GPS при загрузке
+    //  GEO-DIABLO 3: СТАТУС GPS ВВЕРХУ, ОРБЫ БЕЗ АРТЕФАКТОВ
     // ============================================================
     
-    let map, playerMarker, accuracyCircle, watchId, currentLocation = null;
+    let map, playerMarker, watchId, currentLocation = null;
     let revealedCircles = [];
     const FOG_RADIUS = 70;
     
-    let player = { lvl: 1, hp: 100, maxHp: 100, mana: 100, maxMana: 100, xp: 0, gold: 0, resources: 0 };
+    let player = {
+        lvl: 1, hp: 100, maxHp: 100, mana: 100, maxMana: 100,
+        xp: 0, gold: 0, resources: 0
+    };
     let activeMode = 'melee';
     let monsters = [], interactives = [], nextId = 1;
     
-    const MAX_MONSTERS = 6, SPAWN_RADIUS = 70, MIN_SPAWN_DIST = 30, FIREBALL_RANGE = 50;
+    const MAX_MONSTERS = 6, SPAWN_RADIUS = 70, MIN_SPAWN_DIST = 30, FIRE_RANGE = 50;
     
-    function showEventMessage(msg, isError = false) {
-        let el = document.getElementById('eventMessage');
+    function eventMsg(msg, isErr = false) {
+        let el = document.getElementById('eventMsg');
         el.innerHTML = msg;
-        el.style.color = isError ? '#ff8888' : '#ffcc66';
-        setTimeout(() => { if (el.innerHTML === msg) { el.innerHTML = '🔮 Готов к бою'; el.style.color = '#ffcc66'; } }, 3000);
+        el.style.color = isErr ? '#ff8888' : '#ffcc66';
+        setTimeout(() => {
+            if (el.innerHTML === msg) { el.innerHTML = '🔮 Готов к бою'; el.style.color = '#ffcc66'; }
+        }, 2500);
     }
     
     // Туман войны
@@ -308,7 +302,7 @@
         map.on('moveend zoomend', draw);
         window.drawFog = draw;
     }
-    function revealArea(lat, lng) { revealedCircles.push({lat,lng, radius:FOG_RADIUS}); if(window.drawFog) window.drawFog(); }
+    function revealArea(lat,lng) { revealedCircles.push({lat,lng,radius:FOG_RADIUS}); if(window.drawFog) window.drawFog(); }
     
     // Карта
     function initMap() {
@@ -316,159 +310,173 @@
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM', subdomains: 'abcd', maxZoom: 19 }).addTo(map);
         initFog();
         map.on('click', e => {
-            let lat = e.latlng.lat, lng = e.latlng.lng, closest = null, minDist = 20;
-            for (let m of monsters) { let d = distance(lat,lng,m.lat,m.lng); if(d<minDist){minDist=d; closest=m;} }
-            if(closest){ if(activeMode==='melee') meleeAttack(closest); else fireballAttack(closest); return; }
-            for(let obj of interactives) if(distance(lat,lng,obj.lat,obj.lng)<15) collectInteractive(obj);
+            let lat = e.latlng.lat, lng = e.latlng.lng, closest = null, minD = 20;
+            for (let m of monsters) { let d = dist(lat,lng,m.lat,m.lng); if (d < minD) { minD = d; closest = m; } }
+            if (closest) {
+                if (activeMode === 'melee') meleeAttack(closest);
+                else fireAttack(closest);
+                return;
+            }
+            for (let obj of interactives) if (dist(lat,lng,obj.lat,obj.lng) < 15) collectObj(obj);
         });
     }
-    function centerOnPlayer() { if(currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 16); }
+    function centerOnPlayer() { if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 16); }
     
     // Иконки
-    function getPlayerIcon() { return L.divIcon({html:`<div style="background:#2c6e2c; width:34px; height:34px; border-radius:50%; border:3px solid #ffd966; display:flex; align-items:center; justify-content:center; font-size:22px;">🧙‍♀️</div>`, iconSize:[34,34]}); }
-    function getMonsterIcon(t){ let e='🧟‍♂️'; if(t==='skeleton_melee') e='💀'; else if(t==='skeleton_archer') e='🏹'; return L.divIcon({html:`<div style="background:#3a1a1a; width:30px; height:30px; border-radius:50%; border:2px solid #aa4444; display:flex; align-items:center; justify-content:center; font-size:20px;">${e}</div>`, iconSize:[30,30]}); }
-    function getInteractiveIcon(t){ let e='📦'; if(t==='barrel') e='🪣'; if(t==='altar') e='🗿'; return L.divIcon({html:`<div style="background:#2a2a1a; width:28px; height:28px; border-radius:20%; border:1px solid #c9aa4b; display:flex; align-items:center; justify-content:center; font-size:20px;">${e}</div>`, iconSize:[28,28]}); }
+    function playerIcon() { return L.divIcon({html:`<div style="background:#2c6e2c; width:34px; height:34px; border-radius:50%; border:3px solid #ffd966; display:flex; align-items:center; justify-content:center; font-size:22px;">🧙‍♀️</div>`, iconSize:[34,34]}); }
+    function monsterIcon(t) { let e = '🧟‍♂️'; if (t === 'skeleton_melee') e = '💀'; else if (t === 'skeleton_archer') e = '🏹'; return L.divIcon({html:`<div style="background:#3a1a1a; width:30px; height:30px; border-radius:50%; border:2px solid #aa4444; display:flex; align-items:center; justify-content:center; font-size:20px;">${e}</div>`, iconSize:[30,30]}); }
+    function interIcon(t) { let e = '📦'; if (t === 'barrel') e = '🪣'; if (t === 'altar') e = '🗿'; return L.divIcon({html:`<div style="background:#2a2a1a; width:28px; height:28px; border-radius:20%; border:1px solid #c9aa4b; display:flex; align-items:center; justify-content:center; font-size:20px;">${e}</div>`, iconSize:[28,28]}); }
     
     // UI
-    function updateUI(){
+    function updateUI() {
         document.getElementById('lvl').innerText = player.lvl;
-        document.getElementById('hpCurrent').innerText = Math.max(0,player.hp);
-        document.getElementById('hpMax').innerText = player.maxHp;
-        document.getElementById('manaCurrent').innerText = Math.floor(player.mana);
-        document.getElementById('manaMax').innerText = player.maxMana;
+        document.getElementById('hpVal').innerText = Math.max(0, player.hp);
+        document.getElementById('hpMaxVal').innerText = player.maxHp;
+        document.getElementById('manaVal').innerText = Math.floor(player.mana);
+        document.getElementById('manaMaxVal').innerText = player.maxMana;
         document.getElementById('gold').innerText = player.gold;
         document.getElementById('xp').innerText = player.xp;
-        document.getElementById('xpNext').innerText = player.lvl*100;
+        document.getElementById('xpNext').innerText = player.lvl * 100;
         document.getElementById('resources').innerText = player.resources;
-        document.getElementById('hpFillOrb').style.height = (player.hp/player.maxHp*100)+'%';
-        document.getElementById('manaFillOrb').style.height = (player.mana/player.maxMana*100)+'%';
+        document.getElementById('hpFill').style.height = (player.hp / player.maxHp * 100) + '%';
+        document.getElementById('manaFill').style.height = (player.mana / player.maxMana * 100) + '%';
     }
-    function setActiveMode(mode){
+    
+    function setMode(mode) {
         activeMode = mode;
-        let melee = document.getElementById('meleeBtn'), fire = document.getElementById('fireballBtn'), info = document.getElementById('infoCenter');
-        if(mode==='melee'){
+        let melee = document.getElementById('meleeBtn'), fire = document.getElementById('fireBtn'), info = document.getElementById('modeInfo');
+        if (mode === 'melee') {
             melee.classList.add('active'); fire.classList.remove('active');
-            info.innerHTML = '<div class="mode-name">⚔️ Режим: Удар</div><div class="mode-cost">💰 Бесплатно</div>';
+            info.innerHTML = '⚔️ Режим: Удар (бесплатно)';
         } else {
             fire.classList.add('active'); melee.classList.remove('active');
-            info.innerHTML = '<div class="mode-name">🔥 Режим: Огонь</div><div class="mode-cost">🪄 30 маны | 50 м</div>';
+            info.innerHTML = '🔥 Режим: Огонь (30 маны, 50 м)';
         }
     }
-    function distance(lat1,lng1,lat2,lng2){ const R=6371000, φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180, Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lng2-lng1)*Math.PI/180, a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
+    
+    function dist(lat1,lng1,lat2,lng2) { const R=6371000, φ1=lat1*Math.PI/180, φ2=lat2*Math.PI/180, Δφ=(lat2-lat1)*Math.PI/180, Δλ=(lng2-lng1)*Math.PI/180, a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
     
     // Атаки
-    function meleeAttack(m){
-        if(!currentLocation) return;
-        let d = distance(currentLocation.lat,currentLocation.lng,m.lat,m.lng);
-        if(d>15){ showEventMessage(`❌ Далеко (${Math.floor(d)}м)`,true); return; }
-        m.hp -= 25; showEventMessage(`⚔️ Удар! ${m.hp} ❤️`);
-        if(m.hp<=0) killMonster(m);
+    function meleeAttack(m) {
+        if (!currentLocation) return;
+        let d = dist(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+        if (d > 15) { eventMsg(`❌ Далеко (${Math.floor(d)}м)`, true); return; }
+        m.hp -= 25; eventMsg(`⚔️ Удар! ${m.hp} ❤️`);
+        if (m.hp <= 0) killMonster(m);
         hitFlash();
     }
-    function fireballAttack(m){
-        if(player.mana<30){ showEventMessage('❌ Нет маны',true); return; }
-        if(!currentLocation) return;
-        let d = distance(currentLocation.lat,currentLocation.lng,m.lat,m.lng);
-        if(d>FIREBALL_RANGE){ showEventMessage(`❌ Далеко (${Math.floor(d)}м)`,true); return; }
-        player.mana-=30; m.hp-=45; updateUI(); showEventMessage(`🔥 Огонь! ${m.hp} ❤️`);
-        if(m.hp<=0) killMonster(m);
+    function fireAttack(m) {
+        if (player.mana < 30) { eventMsg('❌ Нет маны', true); return; }
+        if (!currentLocation) return;
+        let d = dist(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+        if (d > FIRE_RANGE) { eventMsg(`❌ Далеко (${Math.floor(d)}м)`, true); return; }
+        player.mana -= 30; m.hp -= 45; updateUI(); eventMsg(`🔥 Огонь! ${m.hp} ❤️`);
+        if (m.hp <= 0) killMonster(m);
         hitFlash();
-        setTimeout(()=>{ if(player.mana<player.maxMana){ player.mana=Math.min(player.maxMana,player.mana+5); updateUI(); } },1000);
+        setTimeout(() => { if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 5); updateUI(); } }, 1000);
     }
-    function killMonster(m){
-        let gainXp=20+Math.floor(Math.random()*10), gainGold=8+Math.floor(Math.random()*12);
-        player.xp+=gainXp; player.gold+=gainGold;
-        let need=player.lvl*100;
-        if(player.xp>=need){
-            player.lvl++; player.xp-=need; player.maxHp+=15; player.hp=player.maxHp; player.maxMana+=10; player.mana=player.maxMana;
-            showEventMessage(`🎉 УРОВЕНЬ ${player.lvl}!`);
+    function killMonster(m) {
+        let gainXp = 20 + Math.floor(Math.random()*10), gainGold = 8 + Math.floor(Math.random()*12);
+        player.xp += gainXp; player.gold += gainGold;
+        let need = player.lvl * 100;
+        if (player.xp >= need) {
+            player.lvl++; player.xp -= need; player.maxHp += 15; player.hp = player.maxHp; player.maxMana += 10; player.mana = player.maxMana;
+            eventMsg(`🎉 УРОВЕНЬ ${player.lvl}!`);
         }
-        updateUI(); removeMonster(m.id); showEventMessage(`💀 +${gainXp} XP, +${gainGold} 🪙`);
-        if(Math.random()<0.3) addInteractive(m.lat,m.lng,Math.random()<0.7?'barrel':'chest');
+        updateUI(); removeMonster(m.id); eventMsg(`💀 +${gainXp} XP, +${gainGold} 🪙`);
+        if (Math.random() < 0.3) addInteractive(m.lat, m.lng, Math.random()<0.7?'barrel':'chest');
     }
-    function hitFlash(){ let f=document.createElement('div'); f.className='hit-effect'; document.body.appendChild(f); setTimeout(()=>f.remove(),200); }
+    function hitFlash() { let f = document.createElement('div'); f.className = 'hit-effect'; document.body.appendChild(f); setTimeout(()=>f.remove(),200); }
     
     // Мир
-    function addInteractive(lat,lng,type){
-        let id=nextId++, gold=0, mana=0;
-        if(type==='chest'){ gold=20+Math.floor(Math.random()*40); mana=10; }
-        if(type==='barrel') gold=5+Math.floor(Math.random()*10);
-        if(type==='altar') mana=15;
-        let marker=L.marker([lat,lng],{icon:getInteractiveIcon(type)}).addTo(map);
+    function addInteractive(lat,lng,type) {
+        let id = nextId++, gold = 0, mana = 0;
+        if (type === 'chest') { gold = 20 + Math.floor(Math.random()*40); mana = 10; }
+        if (type === 'barrel') gold = 5 + Math.floor(Math.random()*10);
+        if (type === 'altar') mana = 15;
+        let marker = L.marker([lat,lng], {icon: interIcon(type)}).addTo(map);
         interactives.push({id,lat,lng,type,gold,mana,marker});
     }
-    function collectInteractive(obj){
-        player.gold+=obj.gold; player.mana=Math.min(player.maxMana,player.mana+obj.mana);
-        if(obj.type==='altar') player.maxMana+=10;
+    function collectObj(obj) {
+        player.gold += obj.gold; player.mana = Math.min(player.maxMana, player.mana + obj.mana);
+        if (obj.type === 'altar') player.maxMana += 10;
         player.resources++; updateUI();
-        if(obj.marker) map.removeLayer(obj.marker);
-        let idx=interactives.findIndex(i=>i.id===obj.id); if(idx!==-1) interactives.splice(idx,1);
-        showEventMessage(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
+        if (obj.marker) map.removeLayer(obj.marker);
+        let idx = interactives.findIndex(i => i.id === obj.id); if (idx !== -1) interactives.splice(idx,1);
+        eventMsg(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
     }
-    function addMonster(lat,lng,type){
-        let hp=32; if(type==='skeleton_melee') hp=26; if(type==='skeleton_archer') hp=22;
-        let id=nextId++, marker=L.marker([lat,lng],{icon:getMonsterIcon(type)}).addTo(map);
+    function addMonster(lat,lng,type) {
+        let hp = 32; if (type === 'skeleton_melee') hp = 26; if (type === 'skeleton_archer') hp = 22;
+        let id = nextId++, marker = L.marker([lat,lng], {icon: monsterIcon(type)}).addTo(map);
         monsters.push({id,lat,lng,type,hp,marker});
     }
-    function removeMonster(id){
-        let idx=monsters.findIndex(m=>m.id===id);
-        if(idx!==-1){ if(monsters[idx].marker) map.removeLayer(monsters[idx].marker); monsters.splice(idx,1); }
+    function removeMonster(id) {
+        let idx = monsters.findIndex(m => m.id === id);
+        if (idx !== -1) { if (monsters[idx].marker) map.removeLayer(monsters[idx].marker); monsters.splice(idx,1); }
     }
-    function spawnMonsterNear(lat,lng){
-        if(monsters.length>=MAX_MONSTERS) return;
-        let ang=Math.random()*2*Math.PI, dist=MIN_SPAWN_DIST+Math.random()*SPAWN_RADIUS, dLat=(dist*Math.cos(ang))/111320, dLng=(dist*Math.sin(ang))/(111320*Math.cos(lat*Math.PI/180));
-        let newLat=lat+dLat, newLng=lng+dLng;
-        newLat=Math.min(90,Math.max(-90,newLat)); newLng=Math.min(180,Math.max(-180,newLng));
-        let r=Math.random(), type='zombie';
-        if(r<0.3) type='skeleton_melee';
-        else if(r<0.45) type='skeleton_archer';
-        addMonster(newLat,newLng,type);
+    function spawnMonsterNear(lat,lng) {
+        if (monsters.length >= MAX_MONSTERS) return;
+        let ang = Math.random()*2*Math.PI, d = MIN_SPAWN_DIST + Math.random()*SPAWN_RADIUS, dLat = (d*Math.cos(ang))/111320, dLng = (d*Math.sin(ang))/(111320*Math.cos(lat*Math.PI/180));
+        let newLat = lat + dLat, newLng = lng + dLng;
+        newLat = Math.min(90, Math.max(-90, newLat)); newLng = Math.min(180, Math.max(-180, newLng));
+        let r = Math.random(), type = 'zombie';
+        if (r < 0.3) type = 'skeleton_melee';
+        else if (r < 0.45) type = 'skeleton_archer';
+        addMonster(newLat, newLng, type);
     }
     
     // GPS
-    function updatePlayerOnMap(lat,lng,acc){
-        if(playerMarker) map.removeLayer(playerMarker);
-        if(accuracyCircle) map.removeLayer(accuracyCircle);
-        playerMarker = L.marker([lat,lng],{icon:getPlayerIcon()}).addTo(map);
-        if(acc<300) accuracyCircle = L.circle([lat,lng],{radius:acc,color:'#8bc34a',weight:1,fillOpacity:0.1}).addTo(map);
+    function updateGpsStatus(active, text) {
+        let led = document.getElementById('gpsLed'), txt = document.getElementById('gpsText');
+        if (active) { led.classList.add('active'); txt.innerText = text; }
+        else { led.classList.remove('active'); txt.innerText = text; }
+    }
+    function updatePlayerOnMap(lat,lng,acc) {
+        if (playerMarker) map.removeLayer(playerMarker);
+        playerMarker = L.marker([lat,lng], {icon: playerIcon()}).addTo(map);
         document.getElementById('gpsLed').classList.add('active');
-        document.getElementById('statusText').innerHTML = '🟢 GPS активен';
+        updateGpsStatus(true, 'Активен');
         centerOnPlayer(); revealArea(lat,lng);
     }
-    function onLocation(pos){
+    function onLocation(pos) {
         let {latitude:lat, longitude:lng, accuracy} = pos.coords;
         currentLocation = {lat,lng,accuracy};
         updatePlayerOnMap(lat,lng,accuracy);
-        if(monsters.length<3) for(let i=0;i<2;i++) spawnMonsterNear(lat,lng);
-        if(interactives.length<3 && Math.random()<0.1) addInteractive(lat+(Math.random()-0.5)*0.001,lng+(Math.random()-0.5)*0.001,'barrel');
+        if (monsters.length < 3) for (let i=0;i<2;i++) spawnMonsterNear(lat,lng);
+        if (interactives.length < 3 && Math.random()<0.1) addInteractive(lat+(Math.random()-0.5)*0.001, lng+(Math.random()-0.5)*0.001, 'barrel');
     }
-    function startGPS(){
-        if(!navigator.geolocation){ showEventMessage('❌ GPS не поддерживается',true); return; }
+    function startGPS() {
+        if (!navigator.geolocation) { updateGpsStatus(false, 'Не поддерживается'); eventMsg('❌ GPS не поддерживается', true); return; }
+        updateGpsStatus(false, 'Запрос...');
         navigator.geolocation.getCurrentPosition(
-            (pos)=>{ if(watchId) navigator.geolocation.clearWatch(watchId); watchId=navigator.geolocation.watchPosition(onLocation,console.error,{enableHighAccuracy:true,maximumAge:0,timeout:10000}); onLocation(pos); },
-            (err)=>{ showEventMessage('❌ Разрешите GPS',true); document.getElementById('statusText').innerHTML='❌ GPS запрещён'; },
-            {enableHighAccuracy:true,timeout:10000}
+            (pos) => {
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                watchId = navigator.geolocation.watchPosition(onLocation, (err) => { updateGpsStatus(false, 'Ошибка'); eventMsg('❌ Ошибка GPS', true); }, {enableHighAccuracy:true, maximumAge:0, timeout:10000});
+                onLocation(pos);
+            },
+            (err) => { updateGpsStatus(false, 'Запрещён'); eventMsg('❌ Разрешите GPS', true); },
+            {enableHighAccuracy:true, timeout:10000}
         );
     }
     
     // Запуск
-    window.onload = ()=>{
+    window.onload = () => {
         initMap();
         startGPS();
-        document.getElementById('meleeBtn').onclick = ()=>setActiveMode('melee');
-        document.getElementById('fireballBtn').onclick = ()=>setActiveMode('fireball');
-        setActiveMode('melee');
+        document.getElementById('meleeBtn').onclick = () => setMode('melee');
+        document.getElementById('fireBtn').onclick = () => setMode('fire');
+        setMode('melee');
         updateUI();
-        setTimeout(()=>{
-            if(currentLocation) for(let i=0;i<3;i++) spawnMonsterNear(currentLocation.lat,currentLocation.lng);
+        setTimeout(() => {
+            if (currentLocation) for (let i=0;i<3;i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
             else { addMonster(55.751244,37.618423,'zombie'); addMonster(55.7515,37.6188,'skeleton_melee'); }
-        },2000);
-        setInterval(()=>{
-            if(player.mana<player.maxMana){ player.mana=Math.min(player.maxMana,player.mana+2); updateUI(); }
-            if(player.hp<player.maxHp && monsters.filter(m=>distance(currentLocation?.lat,currentLocation?.lng,m.lat,m.lng)<25).length===0){
-                player.hp=Math.min(player.maxHp,player.hp+1); updateUI();
+        }, 2000);
+        setInterval(() => {
+            if (player.mana < player.maxMana) { player.mana = Math.min(player.maxMana, player.mana + 2); updateUI(); }
+            if (player.hp < player.maxHp && monsters.filter(m => dist(currentLocation?.lat, currentLocation?.lng, m.lat, m.lng) < 25).length === 0) {
+                player.hp = Math.min(player.maxHp, player.hp + 1); updateUI();
             }
-        },3000);
+        }, 3000);
     };
 </script>
 </body>
