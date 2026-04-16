@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>⚔️ Diablo 3 | Некромант | Миньон + Зелья</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body, html { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0f1a; overflow: hidden; }
+        #map { height: 100%; width: 100%; z-index: 1; }
+        #fogCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        /* Верхняя панель */
+        .top-stats {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 60px;
+            padding: 8px 20px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #d4af37;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #ffefb9;
+        }
+        .stats-left {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.6);
+            padding: 4px 16px;
+            border-radius: 40px;
+        }
+        .gps-item {
+            background: #1a3a1a;
+        }
+        .event-area {
+            background: rgba(0,0,0,0.6);
+            padding: 4px 16px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            color: #ffcc66;
+            max-width: 350px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Нижняя панель с орбами */
+        .bottom-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 20px;
+            z-index: 2000;
+        }
+        
+        /* 3D ОРБЫ */
+        .orb {
+            position: relative;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 2px solid #d4af37;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 -15px 20px rgba(0,0,0,0.6), inset 0 15px 20px rgba(255,255,255,0.15);
+            background: radial-gradient(circle at 35% 35%, #3a0a0a, #1a0000);
+        }
+        .orb-mana {
+            background: radial-gradient(circle at 35% 35%, #0a1a3a, #000a1a);
+        }
+        .orb::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 15%;
+            width: 30%;
+            height: 25%;
+            background: radial-gradient(circle, rgba(255,255,255,0.5), rgba(255,255,255,0));
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 3;
+        }
+        .orb-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(to top, #ff6666, #cc3333);
+            transition: height 0.2s ease-out;
+            border-radius: 0;
+        }
+        .mana-fill {
+            background: linear-gradient(to top, #6699ff, #3355cc);
+        }
+        .orb-content {
+            display: none;
+        }
+        
+        .info-center {
+            flex: 1;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 50px;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            border: 1px solid #d4af37;
+            text-align: center;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #ffefb9;
+        }
+        .info-center .mode-name { font-size: 1.2rem; margin-bottom: 4px; }
+        .info-center .mode-cost { font-size: 0.8rem; color: #ffcc66; }
+        
+        /* ПАНЕЛЬ ДЕЙСТВИЙ (горизонтальная снизу) */
+        .action-bar {
+            position: fixed;
+            bottom: 130px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            padding: 8px 20px;
+            border-radius: 60px;
+            z-index: 1000;
+            border: 1px solid #d4af37;
+        }
+        .action-bar-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #2a2a1a;
+            border: 2px solid #d4af37;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.1s;
+            font-size: 24px;
+            position: relative;
+            font-weight: bold;
+        }
+        .action-bar-btn:active { transform: scale(0.95); }
+        .action-bar-btn.active {
+            background: #d4a017;
+            box-shadow: 0 0 15px gold;
+        }
+        .potion-count {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #1a1a1a;
+            color: #ffcc66;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 20px;
+            border: 1px solid #d4af37;
+        }
+        .hp-potion { background: #8b0000; box-shadow: 0 0 10px #ff4444; }
+        .mana-potion { background: #00008b; box-shadow: 0 0 10px #4444ff; }
+        .melee-btn { background: #5a3a1a; }
+        .summon-btn { background: #3a2a5a; }
+        
+        .minion-attack {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #00ff00, #008800);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: hitFlash 0.2s ease-out;
+        }
+        
+        .hit-effect {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,0,0,0.3);
+            pointer-events: none;
+            z-index: 999;
+            animation: hitFlash 0.2s ease-out;
+        }
+        @keyframes hitFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+        
+        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; display: inline-block; }
+        .led.active { background-color: #8bc34a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        @media (max-width: 700px) {
+            .orb { width: 65px; height: 65px; }
+            .action-bar-btn { width: 50px; height: 50px; font-size: 20px; }
+            .action-bar { bottom: 110px; gap: 10px; padding: 6px 15px; }
+            .info-center { font-size: 0.8rem; padding: 8px 12px; }
+            .stats-left { gap: 8px; }
+            .stat-item { padding: 2px 10px; font-size: 0.7rem; }
+            .event-area { max-width: 150px; font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+<canvas id="fogCanvas"></canvas>
+
+<div class="top-stats">
+    <div class="stats-left">
+        <div class="stat-item">🧙‍♂️ Ур. <span id="lvl">1</span></div>
+        <div class="stat-item">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
+        <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
+        <div class="stat-item">📦 <span id="resources">0</span></div>
+        <div class="stat-item gps-item">
+            <span class="led" id="gpsLed"></span>
+            <span id="statusText">🌍 Запрос GPS...</span>
+        </div>
+    </div>
+    <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
+</div>
+
+<div class="bottom-panel">
+    <div class="orb orb-hp">
+        <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
+    </div>
+    <div class="info-center" id="infoCenter">
+        <div class="mode-name">⚔️ Режим: Удар</div>
+        <div class="mode-cost">💰 Бесплатно</div>
+    </div>
+    <div class="orb orb-mana">
+        <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
+    </div>
+</div>
+
+<!-- Панель действий (горизонтальная) -->
+<div class="action-bar">
+    <div class="action-bar-btn melee-btn" id="meleeBtn">
+        ⚔️
+    </div>
+    <div class="action-bar-btn summon-btn" id="summonBtn">
+        🧟
+        <span class="potion-count" id="summonCost">50</span>
+    </div>
+    <div class="action-bar-btn hp-potion" id="hpPotionBtn">
+        🧪
+        <span class="potion-count" id="hpPotionCount">3</span>
+    </div>
+    <div class="action-bar-btn mana-potion" id="manaPotionBtn">
+        💧
+        <span class="potion-count" id="manaPotionCount">2</span>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    //  НЕКРОМАНТ + МИНЬОН + ЗЕЛЬЯ + БЕЗ РЕГЕНЕРАЦИИ
+    //  - Зум 17 (приближенный обзор)
+    //  - Удар (бесплатно)
+    //  - Призыв миньона (50 маны)
+    //  - Миньон ходит по карте и атакует монстров
+    //  - Зомби ходят к игроку и атакуют
+    // ============================================================
+    
+    let map;
+    let playerMarker = null;
+    let accuracyCircle = null;
+    let watchId = null;
+    let currentLocation = null;
+    
+    let revealedCircles = [];
+    const FOG_RADIUS = 70;
+    
+    let player = {
+        lvl: 1,
+        hp: 100,
+        maxHp: 100,
+        mana: 100,
+        maxMana: 100,
+        xp: 0,
+        gold: 0,
+        resources: 0,
+        hpPotions: 3,
+        manaPotions: 2
+    };
+    
+    let activeMode = 'melee'; // 'melee' или 'summon'
+    let monsters = [];
+    let interactives = [];
+    let minion = null; // { id, marker, lat, lng, hp, attackCd, target }
+    let nextId = 1;
+    
+    const MAX_MONSTERS = 6;
+    const SPAWN_RADIUS = 50;      // Ближе к игроку
+    const MIN_SPAWN_DIST = 20;
+    const COLLECT_RADIUS = 8;
+    const SUMMON_MANA_COST = 50;
+    const MELEE_RANGE = 15;
+    const ZOMBIE_SPEED = 0.00004;
+    const MINION_SPEED = 0.00005;
+    
+    // Звуки
+    let audioEnabled = false;
+    let hitSound = null;
+    let summonSound = null;
+    let collectSound = null;
+    let potionSound = null;
+    
+    function initAudio() {
+        if (audioEnabled) return;
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioContext();
+            
+            const hitBuffer = ctx.createBuffer(1, 8000, 44100);
+            const hitData = hitBuffer.getChannelData(0);
+            for (let i = 0; i < 8000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 30);
+                hitData[i] = (Math.sin(2 * Math.PI * 300 * t) + (Math.random() - 0.5) * 0.3) * env * 0.3;
+            }
+            
+            const summonBuffer = ctx.createBuffer(1, 10000, 44100);
+            const summonData = summonBuffer.getChannelData(0);
+            for (let i = 0; i < 10000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 10);
+                summonData[i] = Math.sin(2 * Math.PI * 150 * t) * env * 0.3;
+            }
+            
+            const collectBuffer = ctx.createBuffer(1, 4000, 44100);
+            const collectData = collectBuffer.getChannelData(0);
+            for (let i = 0; i < 4000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 20);
+                collectData[i] = Math.sin(2 * Math.PI * 800 * t) * env * 0.2;
+            }
+            
+            const potionBuffer = ctx.createBuffer(1, 3000, 44100);
+            const potionData = potionBuffer.getChannelData(0);
+            for (let i = 0; i < 3000; i++) {
+                let t = i / 44100;
+                let env = Math.exp(-t * 25);
+                potionData[i] = Math.sin(2 * Math.PI * 600 * t) * env * 0.25;
+            }
+            
+            hitSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = hitBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            summonSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = summonBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            collectSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = collectBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            potionSound = { play: () => { const c = new AudioContext(); const s = c.createBufferSource(); s.buffer = potionBuffer; s.connect(c.destination); s.start(); c.resume(); } };
+            audioEnabled = true;
+        } catch(e) { console.log("Audio not supported"); }
+    }
+    
+    function showEventMessage(msg, isError = false) {
+        const eventDiv = document.getElementById('eventMessage');
+        eventDiv.innerHTML = msg;
+        eventDiv.style.color = isError ? '#ff8888' : '#ffcc66';
+        setTimeout(() => {
+            if (document.getElementById('eventMessage').innerHTML === msg) {
+                eventDiv.innerHTML = '🔮 Готов к бою';
+                eventDiv.style.color = '#ffcc66';
+            }
+        }, 3000);
+    }
+    
+    function updatePotionUI() {
+        document.getElementById('hpPotionCount').innerText = player.hpPotions;
+        document.getElementById('manaPotionCount').innerText = player.manaPotions;
+    }
+    
+    function useHpPotion() {
+        if (player.hpPotions <= 0) { showEventMessage('❌ Нет зелий лечения!', true); return; }
+        if (player.hp >= player.maxHp) { showEventMessage('❌ Здоровье уже полное', true); return; }
+        player.hp = Math.min(player.maxHp, player.hp + 50);
+        player.hpPotions--;
+        updateUI();
+        updatePotionUI();
+        showEventMessage('🧪 Зелье лечения +50 HP');
+        if (audioEnabled && potionSound) potionSound.play();
+        hitFlash();
+    }
+    
+    function useManaPotion() {
+        if (player.manaPotions <= 0) { showEventMessage('❌ Нет зелий маны!', true); return; }
+        if (player.mana >= player.maxMana) { showEventMessage('❌ Мана уже полная', true); return; }
+        player.mana = Math.min(player.maxMana, player.mana + 30);
+        player.manaPotions--;
+        updateUI();
+        updatePotionUI();
+        showEventMessage('💧 Зелье маны +30 MP');
+        if (audioEnabled && potionSound) potionSound.play();
+        hitFlash();
+    }
+    
+    function summonMinion() {
+        if (!currentLocation) { showEventMessage('❌ Нет GPS', true); return; }
+        if (player.mana < SUMMON_MANA_COST) { showEventMessage('❌ Не хватает маны!', true); return; }
+        if (minion) { showEventMessage('❌ У вас уже есть миньон!', true); return; }
+        
+        player.mana -= SUMMON_MANA_COST;
+        updateUI();
+        
+        const minionId = nextId++;
+        // Улучшенная иконка миньона — синий призрак, чтобы отличаться от зомби
+        const minionMarker = L.marker([currentLocation.lat, currentLocation.lng], {
+            icon: L.divIcon({
+                html: `<div style="background:#4a4aff; width:32px; height:32px; border-radius:50%; border:2px solid #aaffff; display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 10px #00ffff;">🪽💀</div>`,
+                iconSize: [32, 32]
+            })
+        }).addTo(map);
+        
+        minion = {
+            id: minionId,
+            marker: minionMarker,
+            lat: currentLocation.lat,
+            lng: currentLocation.lng,
+            hp: 50,
+            maxHp: 50,
+            attackCd: 0,
+            target: null
+        };
+        
+        showEventMessage('🧟 Миньон призван!');
+        if (audioEnabled && summonSound) summonSound.play();
+    }
+    
+    // ДВИЖЕНИЕ ЗОМБИ К ИГРОКУ
+    function updateMonstersMovement() {
+        if (!currentLocation) return;
+        for (let m of monsters) {
+            // Направление к игроку
+            const dx = currentLocation.lat - m.lat;
+            const dy = currentLocation.lng - m.lng;
+            const len = Math.hypot(dx, dy);
+            if (len > 0.00001) {
+                const move = Math.min(ZOMBIE_SPEED, len);
+                m.lat += dx / len * move;
+                m.lng += dy / len * move;
+                m.marker.setLatLng([m.lat, m.lng]);
+            }
+            // Атака, если подошли близко
+            const distToPlayer = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+            if (distToPlayer < 12 && (m.attackCd || 0) <= 0) {
+                player.hp = Math.max(0, player.hp - 8);
+                updateUI();
+                m.attackCd = 30;
+                showEventMessage(`🧟 Зомби атакует! -8 HP`, true);
+                if (player.hp <= 0) {
+                    player.hp = player.maxHp;
+                    player.gold = Math.floor(player.gold * 0.7);
+                    updateUI();
+                    showEventMessage(`💀 ВОСКРЕШЕНИЕ...`, true);
+                }
+                hitFlash();
+            }
+            if (m.attackCd > 0) m.attackCd--;
+        }
+    }
+    
+    function updateMinion() {
+        if (!minion || !currentLocation) return;
+        
+        // Миньон следует за игроком, если нет цели
+        if (!minion.target || minion.target.hp <= 0) {
+            // Ищем ближайшего монстра
+            let closest = null;
+            let minDist = 100;
+            for (let m of monsters) {
+                const dist = distance(minion.lat, minion.lng, m.lat, m.lng);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = m;
+                }
+            }
+            minion.target = closest;
+        }
+        
+        // Движение к цели
+        if (minion.target) {
+            const dx = minion.target.lat - minion.lat;
+            const dy = minion.target.lng - minion.lng;
+            const len = Math.hypot(dx, dy);
+            if (len > 0.00001) {
+                const move = Math.min(MINION_SPEED, len);
+                minion.lat += dx / len * move;
+                minion.lng += dy / len * move;
+                minion.marker.setLatLng([minion.lat, minion.lng]);
+            }
+            
+            // Атака
+            const distToTarget = distance(minion.lat, minion.lng, minion.target.lat, minion.target.lng);
+            if (distToTarget < 15 && minion.attackCd <= 0) {
+                minion.target.hp -= 15;
+                minion.attackCd = 30;
+                showEventMessage(`💀 Миньон атакует! ${minion.target.hp} ❤️`);
+                if (audioEnabled && hitSound) hitSound.play();
+                
+                // Визуальный эффект атаки миньона
+                const targetPoint = map.latLngToContainerPoint([minion.target.lat, minion.target.lng]);
+                const flash = document.createElement('div');
+                flash.className = 'minion-attack';
+                flash.style.left = targetPoint.x + 'px';
+                flash.style.top = targetPoint.y + 'px';
+                document.body.appendChild(flash);
+                setTimeout(() => flash.remove(), 200);
+                
+                if (minion.target.hp <= 0) {
+                    killMonster(minion.target);
+                    minion.target = null;
+                }
+            }
+            if (minion.attackCd > 0) minion.attackCd--;
+        } else {
+            // Если нет цели, миньон идёт к игроку
+            const dx = currentLocation.lat - minion.lat;
+            const dy = currentLocation.lng - minion.lng;
+            const len = Math.hypot(dx, dy);
+            if (len > 0.00001) {
+                const move = Math.min(MINION_SPEED, len);
+                minion.lat += dx / len * move;
+                minion.lng += dy / len * move;
+                minion.marker.setLatLng([minion.lat, minion.lng]);
+            }
+        }
+    }
+    
+    function initFog() {
+        const canvas = document.getElementById('fogCanvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawFog();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        function drawFog() {
+            if (!map) return;
+            const bounds = map.getBounds();
+            const topLeft = map.latLngToContainerPoint(bounds.getNorthWest());
+            const bottomRight = map.latLngToContainerPoint(bounds.getSouthEast());
+            canvas.width = bottomRight.x - topLeft.x;
+            canvas.height = bottomRight.y - topLeft.y;
+            canvas.style.left = topLeft.x + 'px';
+            canvas.style.top = topLeft.y + 'px';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0,0,0,0.88)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'destination-out';
+            for (let circ of revealedCircles) {
+                const point = map.latLngToContainerPoint([circ.lat, circ.lng]);
+                const radiusPx = circ.radius / map.getZoomScale(map.getZoom());
+                ctx.beginPath();
+                ctx.arc(point.x - topLeft.x, point.y - topLeft.y, radiusPx, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        map.on('moveend zoomend', drawFog);
+        window.drawFog = drawFog;
+    }
+    
+    function revealArea(lat, lng) {
+        revealedCircles.push({ lat, lng, radius: FOG_RADIUS });
+        if (window.drawFog) window.drawFog();
+    }
+    
+    function initMap() {
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 17);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OSM',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+        initFog();
+        
+        map.on('click', (e) => {
+            const clickedLat = e.latlng.lat;
+            const clickedLng = e.latlng.lng;
+            let closestMonster = null;
+            let minDist = 20;
+            for (let m of monsters) {
+                const dist = distance(clickedLat, clickedLng, m.lat, m.lng);
+                if (dist < minDist) { minDist = dist; closestMonster = m; }
+            }
+            if (closestMonster && activeMode === 'melee') {
+                meleeAttack(closestMonster);
+                return;
+            }
+            for (let obj of interactives) {
+                if (distance(clickedLat, clickedLng, obj.lat, obj.lng) < COLLECT_RADIUS) {
+                    collectInteractive(obj);
+                    break;
+                }
+            }
+        });
+    }
+    
+    function centerOnPlayer() {
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
+    }
+    
+    function getPlayerIcon() {
+        return L.divIcon({
+            html: `<div style="background:#2c6e2c; width:34px; height:34px; border-radius:50%; border:3px solid #ffd966; display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 12px gold;">🧙‍♂️</div>`,
+            iconSize: [34, 34]
+        });
+    }
+    
+    function getMonsterIcon(type) {
+        let emoji = '🧟‍♂️';
+        if (type === 'skeleton_melee') emoji = '💀';
+        else if (type === 'skeleton_archer') emoji = '🏹';
+        return L.divIcon({
+            html: `<div style="background:#3a1a1a; width:30px; height:30px; border-radius:50%; border:2px solid #aa4444; display:flex; align-items:center; justify-content:center; font-size:20px;">${emoji}</div>`,
+            iconSize: [30, 30]
+        });
+    }
+    
+    function getInteractiveIcon(type) {
+        let emoji = '📦';
+        if (type === 'barrel') emoji = '🪣';
+        if (type === 'altar') emoji = '🗿';
+        return L.divIcon({
+            html: `<div style="background:#2a2a1a; width:28px; height:28px; border-radius:20%; border:1px solid #c9aa4b; display:flex; align-items:center; justify-content:center; font-size:20px;">${emoji}</div>`,
+            iconSize: [28, 28]
+        });
+    }
+    
+    function updateUI() {
+        document.getElementById('lvl').innerText = player.lvl;
+        document.getElementById('xp').innerText = player.xp;
+        document.getElementById('xpNext').innerText = player.lvl * 100;
+        document.getElementById('gold').innerText = player.gold;
+        document.getElementById('resources').innerText = player.resources;
+        
+        const hpPercent = (player.hp / player.maxHp * 100);
+        const manaPercent = (player.mana / player.maxMana * 100);
+        document.getElementById('hpFillOrb').style.height = hpPercent + '%';
+        document.getElementById('manaFillOrb').style.height = manaPercent + '%';
+    }
+    
+    function setActiveMode(mode) {
+        activeMode = mode;
+        const meleeBtn = document.getElementById('meleeBtn');
+        const summonBtn = document.getElementById('summonBtn');
+        const infoCenter = document.getElementById('infoCenter');
+        if (mode === 'melee') {
+            meleeBtn.classList.add('active');
+            summonBtn.classList.remove('active');
+            infoCenter.innerHTML = '<div class="mode-name">⚔️ Режим: Удар</div><div class="mode-cost">💰 Бесплатно</div>';
+        } else {
+            meleeBtn.classList.remove('active');
+            summonBtn.classList.add('active');
+            infoCenter.innerHTML = '<div class="mode-name">🧟 Режим: Призыв</div><div class="mode-cost">🪄 Стоимость: 50 маны</div>';
+        }
+    }
+    
+    function distance(lat1, lng1, lat2, lng2) {
+        const R = 6371000;
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lng2-lng1) * Math.PI/180;
+        const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    
+    function meleeAttack(monster) {
+        if (!currentLocation) return;
+        const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
+        if (dist > MELEE_RANGE) { showEventMessage(`❌ Далеко (${Math.floor(dist)}м)`, true); return; }
+        monster.hp -= 25;
+        showEventMessage(`⚔️ Удар! ${monster.hp} ❤️`);
+        if (audioEnabled && hitSound) hitSound.play();
+        if (monster.hp <= 0) killMonster(monster);
+        hitFlash();
+    }
+    
+    function killMonster(monster) {
+        const gainXp = 20 + Math.floor(Math.random() * 10);
+        const gainGold = 8 + Math.floor(Math.random() * 12);
+        player.xp += gainXp;
+        player.gold += gainGold;
+        
+        if (Math.random() < 0.2) player.hpPotions++;
+        if (Math.random() < 0.15) player.manaPotions++;
+        updatePotionUI();
+        
+        const xpNeeded = player.lvl * 100;
+        if (player.xp >= xpNeeded) {
+            player.lvl++;
+            player.xp -= xpNeeded;
+            player.maxHp += 15;
+            player.hp = player.maxHp;
+            player.maxMana += 10;
+            player.mana = player.maxMana;
+            showEventMessage(`🎉 УРОВЕНЬ ${player.lvl}!`);
+        }
+        updateUI();
+        removeMonster(monster.id);
+        showEventMessage(`💀 +${gainXp} XP, +${gainGold} 🪙`);
+        if (Math.random() < 0.3) addInteractive(monster.lat, monster.lng, Math.random() < 0.7 ? 'barrel' : 'chest');
+        
+        if (minion && minion.target === monster) minion.target = null;
+    }
+    
+    function hitFlash() {
+        const flash = document.createElement('div');
+        flash.className = 'hit-effect';
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 200);
+    }
+    
+    function addInteractive(lat, lng, type) {
+        const id = nextId++;
+        const marker = L.marker([lat, lng], { icon: getInteractiveIcon(type) }).addTo(map);
+        let gold = 0, mana = 0;
+        if (type === 'chest') { gold = 20 + Math.floor(Math.random() * 40); mana = 10; }
+        if (type === 'barrel') gold = 5 + Math.floor(Math.random() * 10);
+        if (type === 'altar') { mana = 15; }
+        interactives.push({ id, lat, lng, type, gold, mana, marker });
+    }
+    
+    function collectInteractive(obj) {
+        if (obj.type === 'altar') {
+            player.hp = player.maxHp;
+            player.mana = player.maxMana;
+            showEventMessage(`🗿 Алтарь восстановил здоровье и ману!`);
+            if (audioEnabled && collectSound) collectSound.play();
+        } else {
+            player.gold += obj.gold;
+            player.mana = Math.min(player.maxMana, player.mana + obj.mana);
+            player.resources++;
+            showEventMessage(`📦 +${obj.gold}🪙 +${obj.mana}🪄`);
+            if (audioEnabled && collectSound) collectSound.play();
+        }
+        updateUI();
+        if (obj.marker) map.removeLayer(obj.marker);
+        const idx = interactives.findIndex(i => i.id === obj.id);
+        if (idx !== -1) interactives.splice(idx, 1);
+    }
+    
+    function addMonster(lat, lng, type) {
+        let hp = 32;
+        if (type === 'skeleton_melee') hp = 26;
+        if (type === 'skeleton_archer') hp = 22;
+        const id = nextId++;
+        const marker = L.marker([lat, lng], { icon: getMonsterIcon(type) }).addTo(map);
+        monsters.push({ id, lat, lng, type, hp, marker, attackCd: 0 });
+    }
+    
+    function removeMonster(id) {
+        const idx = monsters.findIndex(m => m.id === id);
+        if (idx !== -1) {
+            if (monsters[idx].marker) map.removeLayer(monsters[idx].marker);
+            monsters.splice(idx, 1);
+        }
+    }
+    
+    function spawnMonsterNear(lat, lng) {
+        if (monsters.length >= MAX_MONSTERS) return;
+        const angle = Math.random() * 2 * Math.PI;
+        const dist = MIN_SPAWN_DIST + Math.random() * SPAWN_RADIUS;
+        const deltaLat = (dist * Math.cos(angle)) / 111320;
+        const deltaLng = (dist * Math.sin(angle)) / (111320 * Math.cos(lat * Math.PI/180));
+        let newLat = lat + deltaLat, newLng = lng + deltaLng;
+        newLat = Math.min(90, Math.max(-90, newLat));
+        newLng = Math.min(180, Math.max(-180, newLng));
+        const r = Math.random();
+        let type = 'zombie';
+        if (r < 0.3) type = 'skeleton_melee';
+        else if (r < 0.45) type = 'skeleton_archer';
+        addMonster(newLat, newLng, type);
+    }
+    
+    function updatePlayerOnMap(lat, lng, accuracy) {
+        if (playerMarker) map.removeLayer(playerMarker);
+        if (accuracyCircle) map.removeLayer(accuracyCircle);
+        playerMarker = L.marker([lat, lng], { icon: getPlayerIcon() }).addTo(map);
+        if (accuracy < 300) {
+            accuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#8bc34a', weight: 1, fillOpacity: 0.1 }).addTo(map);
+        }
+        document.getElementById('gpsLed').classList.add('active');
+        document.getElementById('statusText').innerHTML = '🟢 Активен';
+        centerOnPlayer();
+        revealArea(lat, lng);
+    }
+    
+    function onLocation(position) {
+        const { latitude: lat, longitude: lng, accuracy } = position.coords;
+        currentLocation = { lat, lng, accuracy };
+        updatePlayerOnMap(lat, lng, accuracy);
+        if (monsters.length < 3) for (let i = 0; i < 2; i++) spawnMonsterNear(lat, lng);
+        if (interactives.length < 3 && Math.random() < 0.1) {
+            addInteractive(lat + (Math.random() - 0.5) * 0.001, lng + (Math.random() - 0.5) * 0.001, 'barrel');
+        }
+    }
+    
+    function startGPS() {
+        if (!navigator.geolocation) { 
+            showEventMessage('❌ GPS не поддерживается', true);
+            document.getElementById('statusText').innerHTML = '❌ Нет GPS';
+            return; 
+        }
+        document.getElementById('statusText').innerHTML = '⏳ Запрос...';
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                watchId = navigator.geolocation.watchPosition(onLocation, (err) => {
+                    console.error(err);
+                    document.getElementById('statusText').innerHTML = '❌ Ошибка';
+                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                onLocation(pos);
+            },
+            (err) => {
+                console.error(err);
+                showEventMessage('❌ Разрешите GPS', true);
+                document.getElementById('statusText').innerHTML = '❌ Запрещён';
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+    
+    window.onload = () => {
+        initMap();
+        startGPS();
+        document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
+        document.getElementById('summonBtn').onclick = () => {
+            if (activeMode === 'summon') summonMinion();
+            else setActiveMode('summon');
+        };
+        document.getElementById('hpPotionBtn').onclick = () => useHpPotion();
+        document.getElementById('manaPotionBtn').onclick = () => useManaPotion();
+        setActiveMode('melee');
+        updateUI();
+        updatePotionUI();
+        
+        const enableAudio = () => {
+            initAudio();
+            document.removeEventListener('touchstart', enableAudio);
+            document.removeEventListener('click', enableAudio);
+        };
+        document.addEventListener('touchstart', enableAudio);
+        document.addEventListener('click', enableAudio);
+        
+        setTimeout(() => {
+            if (currentLocation) for (let i = 0; i < 3; i++) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
+            else { addMonster(55.751244, 37.618423, 'zombie'); addMonster(55.7515, 37.6188, 'skeleton_melee'); }
+        }, 2000);
+        
+        setInterval(() => {
+            updateMonstersMovement();  // Движение зомби к игроку
+            updateMinion();
+        }, 500);
+        
+        // НЕТ АВТОРЕГЕНЕРАЦИИ!
+    };
+</script>
+</body>
+</html>
