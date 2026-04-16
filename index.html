@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>⚔️ GEO-DIABLO: Охота на нечисть</title>
+    <!-- Leaflet + OpenStreetMap -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Firebase (для синхронизации игроков и мобов) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body, html { height: 100%; font-family: system-ui, 'Segoe UI', Roboto, sans-serif; background: #0a0f1a; overflow: hidden; }
+        #map { height: 100%; width: 100%; z-index: 1; }
+        
+        /* Игровая панель (поверх карты) */
+        .game-panel {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 48px;
+            padding: 10px 16px;
+            color: #ffefb9;
+            z-index: 1000;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            border: 1px solid #d4b87a;
+            font-size: 13px;
+            pointer-events: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .stats {
+            display: flex;
+            gap: 12px;
+            background: #1e2a1c;
+            padding: 5px 12px;
+            border-radius: 40px;
+        }
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 1.1rem;
+        }
+        .hp-bar {
+            background: #4a1a1a;
+            border-radius: 20px;
+            height: 8px;
+            width: 80px;
+            overflow: hidden;
+        }
+        .hp-fill {
+            background: #e34d4d;
+            width: 100%;
+            height: 100%;
+            transition: width 0.3s;
+        }
+        button {
+            background: #5a3e1b;
+            border: none;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        button:active { transform: scale(0.96); background: #7e582a; }
+        .skill-btn {
+            background: #2c3e6e;
+            font-size: 18px;
+            padding: 6px 12px;
+        }
+        .coords { font-family: monospace; font-size: 9px; background: #00000066; padding: 4px 8px; border-radius: 20px; }
+        .status { background: #1e2a1c; padding: 4px 12px; border-radius: 40px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+        .led { width: 8px; height: 8px; border-radius: 50%; background-color: #f80; }
+        .led.active { background-color: #8bc34a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+        @media (max-width: 600px) {
+            .game-panel { flex-direction: column; align-items: stretch; top: 8px; left: 8px; right: 8px; border-radius: 32px; }
+            .stats { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="game-panel">
+    <div class="stats">
+        <div class="stat">🧙‍♀️ <span id="lvl">1</span></div>
+        <div class="stat">❤️ <span id="hpCurrent">100</span>/<span id="hpMax">100</span></div>
+        <div class="stat">✨ <span id="xp">0</span>/<span id="xpNext">100</span></div>
+        <div class="stat">🪙 <span id="gold">0</span></div>
+    </div>
+    <div class="hp-bar"><div class="hp-fill" id="hpFill" style="width:100%"></div></div>
+    <div>
+        <button id="attackBtn" class="skill-btn">⚔️ Удар</button>
+        <button id="fireballBtn" class="skill-btn" disabled>🔥 Огонь</button>
+    </div>
+    <div class="status">
+        <span class="led" id="gpsLed"></span>
+        <span id="statusText">🌍 Включи GPS</span>
+    </div>
+    <button id="centerBtn">🎯 Центр</button>
+    <div class="coords" id="coordDisplay">📍 ожидание GPS</div>
+</div>
+
+<script>
+    // ============================================================
+    //  GEO-DIABLO MVP
+    //  - Игрок видит себя на карте (🧙‍♀️)
+    //  - Монстры (зомби, скелеты) ходят к игроку, лучники стреляют
+    //  - Уровни, опыт, золото, огненный шар
+    //  - Синхронизация через Firebase (все игроки видят одних монстров)
+    // ============================================================
+    
+    // ---------- НАСТРОЙКИ FIREBASE (ЗАМЕНИТЕ НА СВОИ) ----------
+    const firebaseConfig = {
+        apiKey: "AIzaSyDummyKeyReplaceWithYourOwn", // ВАЖНО: замените на свои данные из Firebase!
+        authDomain: "geo-diablo.firebaseapp.com",
+        databaseURL: "https://geo-diablo-default-rtdb.firebaseio.com",
+        projectId: "geo-diablo",
+        storageBucket: "geo-diablo.firebasestorage.app",
+        messagingSenderId: "123456789012",
+        appId: "1:123456789012:web:abcdef123456"
+    };
+    // ВАЖНО: БЕЗ НАСТРОЕННОЙ FIREBASE ИГРА БУДЕТ РАБОТАТЬ ТОЛЬКО В ОДНОПОЛЬЗОВАТЕЛЬСКОМ РЕЖИМЕ (локально)
+    // Для работы с Firebase создайте проект на console.firebase.google.com, включите Realtime Database и вставьте свои ключи.
+    
+    let useFirebase = false;
+    let db = null;
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        useFirebase = true;
+        console.log("✅ Firebase подключена");
+    } catch(e) {
+        console.warn("⚠️ Firebase не настроена, работаем локально (без синхронизации)");
+    }
+    
+    // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
+    let map;
+    let playerMarker = null;
+    let accuracyCircle = null;
+    let watchId = null;
+    let currentLocation = null;
+    
+    // Игрок
+    let player = {
+        id: 'player_' + Math.random().toString(36).substr(2, 8),
+        lvl: 1,
+        hp: 100,
+        maxHp: 100,
+        xp: 0,
+        gold: 0,
+        hasFireball: false,
+        fireballCd: 0
+    };
+    
+    // Монстры
+    let monsters = [];
+    let nextMonsterId = 1;
+    
+    // Таймеры
+    let gameLoop = null;
+    let spawnTimer = null;
+    
+    // Параметры
+    const MAX_MONSTERS = 8;
+    const SPAWN_RADIUS = 80;      // метров
+    const MIN_SPAWN_DIST = 30;
+    
+    // ---------- КАРТА ----------
+    function initMap() {
+        map = L.map('map').setView([55.751244, 37.618423], 16);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OSM',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+    }
+    
+    // ---------- ИКОНКИ ----------
+    function getPlayerIcon() {
+        return L.divIcon({
+            html: `<div style="background-color: #2c6e2c; width: 32px; height: 32px; border-radius: 50%; border: 3px solid #ffd966; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 0 12px gold;">🧙‍♀️</div>`,
+            iconSize: [32, 32],
+            className: 'player-icon'
+        });
+    }
+    
+    function getMonsterIcon(type) {
+        let emoji = '🧟‍♂️';
+        if (type === 'skeleton_melee') emoji = '💀';
+        else if (type === 'skeleton_archer') emoji = '🏹';
+        else if (type === 'runner') emoji = '🏃‍♂️💀';
+        return L.divIcon({
+            html: `<div style="background-color: #3a1a1a; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #aa4444; display: flex; align-items: center; justify-content: center; font-size: 18px;">${emoji}</div>`,
+            iconSize: [28, 28],
+            className: 'monster-icon'
+        });
+    }
+    
+    function updatePlayerUI() {
+        document.getElementById('lvl').innerText = player.lvl;
+        document.getElementById('hpCurrent').innerText = Math.max(0, player.hp);
+        document.getElementById('hpMax').innerText = player.maxHp;
+        document.getElementById('hpFill').style.width = (player.hp / player.maxHp * 100) + '%';
+        document.getElementById('xp').innerText = player.xp;
+        const xpNext = player.lvl * 100;
+        document.getElementById('xpNext').innerText = xpNext;
+        document.getElementById('gold').innerText = player.gold;
+        if (player.lvl >= 2 && !player.hasFireball) {
+            player.hasFireball = true;
+            document.getElementById('fireballBtn').disabled = false;
+        }
+    }
+    
+    // ---------- БОЕВЫЕ ДЕЙСТВИЯ ----------
+    function attackMonster(monsterId) {
+        const monster = monsters.find(m => m.id === monsterId);
+        if (!monster || !currentLocation) return;
+        const dist = distance(currentLocation.lat, currentLocation.lng, monster.lat, monster.lng);
+        if (dist > 15) return;
+        
+        monster.hp -= 25;
+        if (monster.hp <= 0) {
+            // Убийство
+            const gainXp = 20 + (monster.type === 'runner' ? 30 : (monster.type === 'skeleton_archer' ? 25 : 15));
+            const gainGold = 5 + Math.floor(Math.random() * 10);
+            player.xp += gainXp;
+            player.gold += gainGold;
+            updatePlayerUI();
+            removeMonster(monster.id);
+            document.getElementById('statusText').innerHTML = `💀 +${gainXp} XP, +${gainGold} 🪙`;
+            setTimeout(() => { if(document.getElementById('statusText').innerHTML.includes('XP')) document.getElementById('statusText').innerHTML = '⚔️ Ищи врагов'; }, 1500);
+            
+            // Проверка уровня
+            const xpNeeded = player.lvl * 100;
+            while (player.xp >= xpNeeded) {
+                player.lvl++;
+                player.xp -= xpNeeded;
+                player.maxHp += 20;
+                player.hp = player.maxHp;
+                updatePlayerUI();
+                document.getElementById('statusText').innerHTML = `🎉 УРОВЕНЬ ${player.lvl}!`;
+            }
+        } else {
+            document.getElementById('statusText').innerHTML = `⚔️ Удар! ${monster.hp} ❤️ осталось`;
+        }
+        if (useFirebase && db) {
+            db.ref('monsters/' + monster.id).set(monsterToJson(monster));
+        }
+    }
+    
+    function castFireball() {
+        if (!player.hasFireball) return;
+        if (player.fireballCd > 0) {
+            document.getElementById('statusText').innerHTML = `🔥 Перезарядка ${player.fireballCd} сек`;
+            return;
+        }
+        if (!currentLocation) return;
+        player.fireballCd = 5;
+        let hitCount = 0;
+        for (let m of monsters) {
+            const dist = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+            if (dist < 25) {
+                m.hp -= 40;
+                if (m.hp <= 0) {
+                    removeMonster(m.id);
+                    player.xp += 20;
+                    player.gold += 8;
+                    hitCount++;
+                }
+            }
+        }
+        if (hitCount > 0) {
+            updatePlayerUI();
+            document.getElementById('statusText').innerHTML = `🔥 Огненный шар уничтожил ${hitCount} врагов!`;
+        } else {
+            document.getElementById('statusText').innerHTML = '🔥 Мимо! Никого не задело';
+        }
+        setTimeout(() => {
+            if (player.fireballCd > 0) player.fireballCd--;
+            if (player.fireballCd > 0) setTimeout(arguments.callee, 1000);
+        }, 1000);
+    }
+    
+    // ---------- УПРАВЛЕНИЕ МОНСТРАМИ ----------
+    function addMonster(lat, lng, type) {
+        let hp = 30, dmg = 5, speed = 0.00003, attackRange = 12;
+        if (type === 'skeleton_melee') { hp = 25; dmg = 8; speed = 0.00005; }
+        else if (type === 'skeleton_archer') { hp = 20; dmg = 6; speed = 0; attackRange = 25; }
+        else if (type === 'runner') { hp = 35; dmg = 4; speed = 0.00009; attackRange = 10; }
+        
+        const id = nextMonsterId++;
+        const marker = L.marker([lat, lng], { icon: getMonsterIcon(type) }).addTo(map);
+        const monster = { id, lat, lng, type, hp, maxHp: hp, dmg, speed, attackRange, marker, attackCooldown: 0 };
+        monsters.push(monster);
+        if (useFirebase && db) {
+            db.ref('monsters/' + id).set(monsterToJson(monster));
+        }
+        return id;
+    }
+    
+    function removeMonster(id) {
+        const idx = monsters.findIndex(m => m.id === id);
+        if (idx !== -1) {
+            if (monsters[idx].marker) map.removeLayer(monsters[idx].marker);
+            monsters.splice(idx, 1);
+            if (useFirebase && db) db.ref('monsters/' + id).remove();
+        }
+    }
+    
+    function monsterToJson(m) {
+        return { id: m.id, lat: m.lat, lng: m.lng, type: m.type, hp: m.hp, maxHp: m.maxHp, dmg: m.dmg, speed: m.speed, attackRange: m.attackRange };
+    }
+    
+    function spawnMonsterNear(lat, lng) {
+        if (monsters.length >= MAX_MONSTERS) return;
+        const angle = Math.random() * 2 * Math.PI;
+        const dist = MIN_SPAWN_DIST + Math.random() * SPAWN_RADIUS;
+        const deltaLat = (dist * Math.cos(angle)) / 111320;
+        const deltaLng = (dist * Math.sin(angle)) / (111320 * Math.cos(lat * Math.PI/180));
+        let newLat = lat + deltaLat;
+        let newLng = lng + deltaLng;
+        newLat = Math.min(90, Math.max(-90, newLat));
+        newLng = Math.min(180, Math.max(-180, newLng));
+        
+        const r = Math.random();
+        let type = 'zombie';
+        if (player.lvl >= 2 && r < 0.2) type = 'runner';
+        else if (r < 0.5) type = 'skeleton_melee';
+        else if (r < 0.7) type = 'skeleton_archer';
+        addMonster(newLat, newLng, type);
+    }
+    
+    // ---------- ДВИЖЕНИЕ МОНСТРОВ (динамика) ----------
+    function updateMonstersMovement() {
+        if (!currentLocation) return;
+        for (let i = 0; i < monsters.length; i++) {
+            const m = monsters[i];
+            if (m.speed === 0) continue; // лучники не ходят
+            
+            const dx = currentLocation.lat - m.lat;
+            const dy = currentLocation.lng - m.lng;
+            const len = Math.hypot(dx, dy);
+            if (len < 0.00001) continue;
+            const move = Math.min(m.speed, len);
+            const newLat = m.lat + dx / len * move;
+            const newLng = m.lng + dy / len * move;
+            m.lat = newLat;
+            m.lng = newLng;
+            m.marker.setLatLng([newLat, newLng]);
+            
+            // Атака ближних монстров
+            const distMeters = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+            if (distMeters < m.attackRange && m.attackCooldown <= 0) {
+                player.hp = Math.max(0, player.hp - m.dmg);
+                updatePlayerUI();
+                m.attackCooldown = 30; // тиков ~1.5 сек
+                document.getElementById('statusText').innerHTML = `💔 ${m.type} атакует! -${m.dmg} ❤️`;
+                if (player.hp <= 0) {
+                    document.getElementById('statusText').innerHTML = '💀 ВОСКРЕШЕНИЕ...';
+                    player.hp = player.maxHp;
+                    player.gold = Math.floor(player.gold * 0.7);
+                    updatePlayerUI();
+                    if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
+                }
+            }
+            if (m.attackCooldown > 0) m.attackCooldown--;
+        }
+        
+        // Атака лучников (стреляют с дистанции)
+        for (let m of monsters) {
+            if (m.type === 'skeleton_archer') {
+                const distMeters = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+                if (distMeters < 30 && distMeters > 10 && m.attackCooldown <= 0) {
+                    player.hp = Math.max(0, player.hp - m.dmg);
+                    updatePlayerUI();
+                    m.attackCooldown = 40;
+                    document.getElementById('statusText').innerHTML = `🏹 Стрела! -${m.dmg} ❤️`;
+                }
+                if (m.attackCooldown > 0) m.attackCooldown--;
+            }
+        }
+        
+        // Синхронизация с Firebase
+        if (useFirebase && db) {
+            monsters.forEach(m => {
+                db.ref('monsters/' + m.id).update({ lat: m.lat, lng: m.lng, hp: m.hp });
+            });
+        }
+    }
+    
+    // ---------- ГЕОЛОКАЦИЯ ----------
+    function distance(lat1, lng1, lat2, lng2) {
+        const R = 6371000;
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lng2-lng1) * Math.PI/180;
+        const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    
+    function updatePlayerOnMap(lat, lng, accuracy) {
+        if (playerMarker) map.removeLayer(playerMarker);
+        if (accuracyCircle) map.removeLayer(accuracyCircle);
+        playerMarker = L.marker([lat, lng], { icon: getPlayerIcon() }).addTo(map);
+        if (accuracy < 300) {
+            accuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#8bc34a', weight: 1, fillOpacity: 0.1 }).addTo(map);
+        }
+        document.getElementById('coordDisplay').innerHTML = `${lat.toFixed(5)} , ${lng.toFixed(5)} ±${Math.round(accuracy)}м`;
+        document.getElementById('gpsLed').classList.add('active');
+        document.getElementById('statusText').innerHTML = '⚔️ Ищи врагов';
+    }
+    
+    function onLocation(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        currentLocation = { lat, lng, accuracy };
+        updatePlayerOnMap(lat, lng, accuracy);
+        if (useFirebase && db) {
+            db.ref('players/' + player.id).set({ lat, lng, hp: player.hp, lvl: player.lvl });
+        }
+    }
+    
+    function startGPS() {
+        if (!navigator.geolocation) { alert("GPS не поддерживается"); return; }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                watchId = navigator.geolocation.watchPosition(onLocation, console.error, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                onLocation(pos);
+            },
+            (err) => { alert("Разрешите GPS в настройках"); },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+    
+    function centerOnMe() {
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
+        else alert("GPS не активен");
+    }
+    
+    // ---------- ЗАПУСК ----------
+    window.onload = () => {
+        initMap();
+        startGPS();
+        
+        // Кнопки
+        document.getElementById('attackBtn').onclick = () => {
+            if (!currentLocation) return;
+            let closest = null;
+            let minDist = 100;
+            for (let m of monsters) {
+                const dist = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
+                if (dist < minDist && dist < 15) { minDist = dist; closest = m; }
+            }
+            if (closest) attackMonster(closest.id);
+            else document.getElementById('statusText').innerHTML = '❌ Нет врагов рядом';
+        };
+        document.getElementById('fireballBtn').onclick = () => castFireball();
+        document.getElementById('centerBtn').onclick = centerOnMe;
+        
+        // Игровой цикл (движение монстров + спавн)
+        setInterval(() => {
+            if (currentLocation) {
+                updateMonstersMovement();
+                if (monsters.length < MAX_MONSTERS && Math.random() < 0.3) {
+                    spawnMonsterNear(currentLocation.lat, currentLocation.lng);
+                }
+            }
+        }, 1200);
+        
+        // Стартовые монстры
+        for (let i = 0; i < 4; i++) {
+            if (currentLocation) spawnMonsterNear(currentLocation.lat, currentLocation.lng);
+            else addMonster(55.751244 + (Math.random() - 0.5)*0.01, 37.618423 + (Math.random() - 0.5)*0.01, 'zombie');
+        }
+        updatePlayerUI();
+    };
+</script>
+</body>
+</html>
