@@ -20,7 +20,7 @@
             z-index: 2;
         }
         
-        /* Верхняя панель: только статистика и события */
+        /* Верхняя панель: статистика + события + GPS */
         .top-stats {
             position: fixed;
             top: 12px;
@@ -43,6 +43,8 @@
         .stats-left {
             display: flex;
             gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
         }
         .stat-item {
             display: flex;
@@ -51,6 +53,9 @@
             background: rgba(0,0,0,0.6);
             padding: 4px 16px;
             border-radius: 40px;
+        }
+        .gps-item {
+            background: #1a3a1a;
         }
         .event-area {
             background: rgba(0,0,0,0.6);
@@ -178,25 +183,6 @@
         .info-center .mode-name { font-size: 1.2rem; margin-bottom: 4px; }
         .info-center .mode-cost { font-size: 0.8rem; color: #ffcc66; }
         
-        .status-bar {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            padding: 6px 16px;
-            border-radius: 40px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            z-index: 1000;
-            font-family: monospace;
-            color: #ffefb9;
-        }
-        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; }
-        .led.active { background-color: #8bc34a; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
-        
         .hit-effect {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -206,6 +192,10 @@
             animation: hitFlash 0.2s ease-out;
         }
         @keyframes hitFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+        
+        .led { width: 10px; height: 10px; border-radius: 50%; background-color: #f80; display: inline-block; }
+        .led.active { background-color: #8bc34a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
         
         @media (max-width: 700px) {
             .orb { width: 65px; height: 65px; }
@@ -225,12 +215,17 @@
 <div id="map"></div>
 <canvas id="fogCanvas"></canvas>
 
-<!-- Верхняя панель: статистика + события -->
+<!-- Верхняя панель: статистика + события + GPS -->
 <div class="top-stats">
     <div class="stats-left">
         <div class="stat-item">🧙‍♀️ Ур. <span id="lvl">1</span></div>
         <div class="stat-item">✨ Опыт <span id="xp">0</span>/<span id="xpNext">100</span></div>
         <div class="stat-item">🪙 Золото <span id="gold">0</span></div>
+        <div class="stat-item">📦 <span id="resources">0</span></div>
+        <div class="stat-item gps-item">
+            <span class="led" id="gpsLed"></span>
+            <span id="statusText">🌍 Запрос GPS...</span>
+        </div>
     </div>
     <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
 </div>
@@ -268,17 +263,13 @@
     </div>
 </div>
 
-<div class="status-bar">
-    <span class="led" id="gpsLed"></span>
-    <span id="statusText">🌍 Включи GPS</span>
-</div>
-
 <script>
     // ============================================================
     //  GEO-DIABLO 3: ФИНАЛ
     //  - Красный шар слева, синий справа, информация между ними
     //  - Огонь летит на 50 метров
     //  - Все события в верхней панели
+    //  - GPS вверху, счётчик ресурсов добавлен
     // ============================================================
     
     let map;
@@ -298,7 +289,8 @@
         mana: 100,
         maxMana: 100,
         xp: 0,
-        gold: 0
+        gold: 0,
+        resources: 0
     };
     
     let activeMode = 'melee';
@@ -309,7 +301,7 @@
     const MAX_MONSTERS = 6;
     const SPAWN_RADIUS = 70;
     const MIN_SPAWN_DIST = 30;
-    const FIREBALL_RANGE = 50; // увеличено до 50 метров
+    const FIREBALL_RANGE = 50;
     
     function showEventMessage(msg, isError = false) {
         const eventDiv = document.getElementById('eventMessage');
@@ -449,6 +441,7 @@
         document.getElementById('gold').innerText = player.gold;
         document.getElementById('xp').innerText = player.xp;
         document.getElementById('xpNext').innerText = player.lvl * 100;
+        document.getElementById('resources').innerText = player.resources;
         
         const hpPercent = (player.hp / player.maxHp * 100);
         const manaPercent = (player.mana / player.maxMana * 100);
@@ -555,6 +548,7 @@
         player.gold += obj.gold;
         player.mana = Math.min(player.maxMana, player.mana + obj.mana);
         if (obj.type === 'altar') player.maxMana += 10;
+        player.resources++;
         updateUI();
         if (obj.marker) map.removeLayer(obj.marker);
         const idx = interactives.findIndex(i => i.id === obj.id);
@@ -606,6 +600,7 @@
             accuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#8bc34a', weight: 1, fillOpacity: 0.1 }).addTo(map);
         }
         document.getElementById('gpsLed').classList.add('active');
+        document.getElementById('statusText').innerHTML = '🟢 Активен';
         centerOnPlayer();
         revealArea(lat, lng);
     }
@@ -621,14 +616,26 @@
     }
     
     function startGPS() {
-        if (!navigator.geolocation) { alert("GPS не поддерживается"); return; }
+        if (!navigator.geolocation) { 
+            showEventMessage('❌ GPS не поддерживается', true);
+            document.getElementById('statusText').innerHTML = '❌ Нет GPS';
+            return; 
+        }
+        document.getElementById('statusText').innerHTML = '⏳ Запрос...';
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 if (watchId) navigator.geolocation.clearWatch(watchId);
-                watchId = navigator.geolocation.watchPosition(onLocation, console.error, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                watchId = navigator.geolocation.watchPosition(onLocation, (err) => {
+                    console.error(err);
+                    document.getElementById('statusText').innerHTML = '❌ Ошибка';
+                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
                 onLocation(pos);
             },
-            () => alert("Разрешите GPS"),
+            (err) => {
+                console.error(err);
+                showEventMessage('❌ Разрешите GPS', true);
+                document.getElementById('statusText').innerHTML = '❌ Запрещён';
+            },
             { enableHighAccuracy: true, timeout: 10000 }
         );
     }
