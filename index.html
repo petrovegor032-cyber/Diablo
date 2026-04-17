@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>⚔️ Diablo 3 | Некромант | Миньон + Зелья</title>
+    <title>⚔️ Некромант | Масштаб +/–</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body, html { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0f1a; overflow: hidden; }
+        body, html { height: 100%; font-family: system-ui, sans-serif; background: #0a0f1a; overflow: hidden; }
         #map { height: 100%; width: 100%; z-index: 1; }
         #fogCanvas {
             position: absolute;
@@ -35,17 +35,10 @@
             justify-content: space-between;
             align-items: center;
             border: 1px solid #d4af37;
-            font-family: monospace;
-            font-weight: bold;
             font-size: 0.9rem;
             color: #ffefb9;
         }
-        .stats-left {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
+        .stats-left { display: flex; gap: 20px; flex-wrap: wrap; }
         .stat-item {
             display: flex;
             align-items: center;
@@ -53,9 +46,6 @@
             background: rgba(0,0,0,0.6);
             padding: 4px 16px;
             border-radius: 40px;
-        }
-        .gps-item {
-            background: #1a3a1a;
         }
         .event-area {
             background: rgba(0,0,0,0.6);
@@ -67,6 +57,44 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        
+        /* Кнопки масштаба +/– */
+        .zoom-controls {
+            position: fixed;
+            top: 80px;
+            right: 12px;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 40px;
+            padding: 8px 12px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #d4af37;
+        }
+        .zoom-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #2a2a1a;
+            border: 2px solid #d4af37;
+            color: #ffefb9;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .zoom-btn:active { transform: scale(0.95); background: #d4a017; }
+        .zoom-value {
+            text-align: center;
+            font-size: 12px;
+            color: #ffcc66;
+            font-weight: bold;
         }
         
         /* Нижняя панель с орбами */
@@ -82,7 +110,6 @@
             z-index: 2000;
         }
         
-        /* 3D ОРБЫ */
         .orb {
             position: relative;
             width: 90px;
@@ -115,14 +142,11 @@
             width: 100%;
             background: linear-gradient(to top, #ff6666, #cc3333);
             transition: height 0.2s ease-out;
-            border-radius: 0;
         }
         .mana-fill {
             background: linear-gradient(to top, #6699ff, #3355cc);
         }
-        .orb-content {
-            display: none;
-        }
+        .orb-content { display: none; }
         
         .info-center {
             flex: 1;
@@ -133,15 +157,12 @@
             margin-bottom: 10px;
             border: 1px solid #d4af37;
             text-align: center;
-            font-family: monospace;
             font-weight: bold;
             font-size: 1.1rem;
             color: #ffefb9;
         }
-        .info-center .mode-name { font-size: 1.2rem; margin-bottom: 4px; }
-        .info-center .mode-cost { font-size: 0.8rem; color: #ffcc66; }
         
-        /* ПАНЕЛЬ ДЕЙСТВИЙ (горизонтальная снизу) */
+        /* Панель действий */
         .action-bar {
             position: fixed;
             bottom: 130px;
@@ -167,10 +188,8 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: 0.1s;
             font-size: 24px;
             position: relative;
-            font-weight: bold;
         }
         .action-bar-btn:active { transform: scale(0.95); }
         .action-bar-btn.active {
@@ -184,26 +203,14 @@
             background: #1a1a1a;
             color: #ffcc66;
             font-size: 12px;
-            font-weight: bold;
             padding: 2px 6px;
             border-radius: 20px;
             border: 1px solid #d4af37;
         }
-        .hp-potion { background: #8b0000; box-shadow: 0 0 10px #ff4444; }
-        .mana-potion { background: #00008b; box-shadow: 0 0 10px #4444ff; }
+        .hp-potion { background: #8b0000; }
+        .mana-potion { background: #00008b; }
         .melee-btn { background: #5a3a1a; }
         .summon-btn { background: #3a2a5a; }
-        
-        .minion-attack {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            background: radial-gradient(circle, #00ff00, #008800);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            animation: hitFlash 0.2s ease-out;
-        }
         
         .hit-effect {
             position: fixed;
@@ -211,7 +218,7 @@
             background: rgba(255,0,0,0.3);
             pointer-events: none;
             z-index: 999;
-            animation: hitFlash 0.2s ease-out;
+            animation: hitFlash 0.2s;
         }
         @keyframes hitFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
         
@@ -223,10 +230,8 @@
             .orb { width: 65px; height: 65px; }
             .action-bar-btn { width: 50px; height: 50px; font-size: 20px; }
             .action-bar { bottom: 110px; gap: 10px; padding: 6px 15px; }
-            .info-center { font-size: 0.8rem; padding: 8px 12px; }
-            .stats-left { gap: 8px; }
-            .stat-item { padding: 2px 10px; font-size: 0.7rem; }
-            .event-area { max-width: 150px; font-size: 0.7rem; }
+            .zoom-controls { top: 70px; right: 8px; padding: 6px 10px; }
+            .zoom-btn { width: 36px; height: 36px; font-size: 20px; }
         }
     </style>
 </head>
@@ -249,6 +254,13 @@
     <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
 </div>
 
+<!-- Кнопки масштаба -->
+<div class="zoom-controls">
+    <div class="zoom-btn" id="zoomIn">+</div>
+    <div class="zoom-value" id="zoomValue">17</div>
+    <div class="zoom-btn" id="zoomOut">-</div>
+</div>
+
 <div class="bottom-panel">
     <div class="orb orb-hp">
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
@@ -262,33 +274,16 @@
     </div>
 </div>
 
-<!-- Панель действий (горизонтальная) -->
 <div class="action-bar">
-    <div class="action-bar-btn melee-btn" id="meleeBtn">
-        ⚔️
-    </div>
-    <div class="action-bar-btn summon-btn" id="summonBtn">
-        🧟
-        <span class="potion-count" id="summonCost">50</span>
-    </div>
-    <div class="action-bar-btn hp-potion" id="hpPotionBtn">
-        🧪
-        <span class="potion-count" id="hpPotionCount">3</span>
-    </div>
-    <div class="action-bar-btn mana-potion" id="manaPotionBtn">
-        💧
-        <span class="potion-count" id="manaPotionCount">2</span>
-    </div>
+    <div class="action-bar-btn melee-btn" id="meleeBtn">⚔️</div>
+    <div class="action-bar-btn summon-btn" id="summonBtn">🧟<span class="potion-count" id="summonCost">50</span></div>
+    <div class="action-bar-btn hp-potion" id="hpPotionBtn">🧪<span class="potion-count" id="hpPotionCount">3</span></div>
+    <div class="action-bar-btn mana-potion" id="manaPotionBtn">💧<span class="potion-count" id="manaPotionCount">2</span></div>
 </div>
 
 <script>
     // ============================================================
-    //  НЕКРОМАНТ + МИНЬОН + ЗЕЛЬЯ + БЕЗ РЕГЕНЕРАЦИИ
-    //  - Зум 17 (приближенный обзор)
-    //  - Удар (бесплатно)
-    //  - Призыв миньона (50 маны)
-    //  - Миньон ходит по карте и атакует монстров
-    //  - Зомби ходят к игроку и атакуют
+    //  НЕКРОМАНТ + МАСШТАБ +/–
     // ============================================================
     
     let map;
@@ -313,20 +308,22 @@
         manaPotions: 2
     };
     
-    let activeMode = 'melee'; // 'melee' или 'summon'
+    let activeMode = 'melee';
     let monsters = [];
     let interactives = [];
-    let minion = null; // { id, marker, lat, lng, hp, attackCd, target }
+    let minion = null;
     let nextId = 1;
     
     const MAX_MONSTERS = 6;
-    const SPAWN_RADIUS = 50;      // Ближе к игроку
+    const SPAWN_RADIUS = 50;
     const MIN_SPAWN_DIST = 20;
     const COLLECT_RADIUS = 8;
     const SUMMON_MANA_COST = 50;
     const MELEE_RANGE = 15;
     const ZOMBIE_SPEED = 0.00004;
     const MINION_SPEED = 0.00005;
+    
+    let currentZoom = 17;
     
     // Звуки
     let audioEnabled = false;
@@ -431,7 +428,6 @@
         updateUI();
         
         const minionId = nextId++;
-        // Улучшенная иконка миньона — синий призрак, чтобы отличаться от зомби
         const minionMarker = L.marker([currentLocation.lat, currentLocation.lng], {
             icon: L.divIcon({
                 html: `<div style="background:#4a4aff; width:32px; height:32px; border-radius:50%; border:2px solid #aaffff; display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 10px #00ffff;">🪽💀</div>`,
@@ -454,11 +450,9 @@
         if (audioEnabled && summonSound) summonSound.play();
     }
     
-    // ДВИЖЕНИЕ ЗОМБИ К ИГРОКУ
     function updateMonstersMovement() {
         if (!currentLocation) return;
         for (let m of monsters) {
-            // Направление к игроку
             const dx = currentLocation.lat - m.lat;
             const dy = currentLocation.lng - m.lng;
             const len = Math.hypot(dx, dy);
@@ -468,7 +462,6 @@
                 m.lng += dy / len * move;
                 m.marker.setLatLng([m.lat, m.lng]);
             }
-            // Атака, если подошли близко
             const distToPlayer = distance(currentLocation.lat, currentLocation.lng, m.lat, m.lng);
             if (distToPlayer < 12 && (m.attackCd || 0) <= 0) {
                 player.hp = Math.max(0, player.hp - 8);
@@ -490,9 +483,7 @@
     function updateMinion() {
         if (!minion || !currentLocation) return;
         
-        // Миньон следует за игроком, если нет цели
         if (!minion.target || minion.target.hp <= 0) {
-            // Ищем ближайшего монстра
             let closest = null;
             let minDist = 100;
             for (let m of monsters) {
@@ -505,7 +496,6 @@
             minion.target = closest;
         }
         
-        // Движение к цели
         if (minion.target) {
             const dx = minion.target.lat - minion.lat;
             const dy = minion.target.lng - minion.lng;
@@ -517,22 +507,12 @@
                 minion.marker.setLatLng([minion.lat, minion.lng]);
             }
             
-            // Атака
             const distToTarget = distance(minion.lat, minion.lng, minion.target.lat, minion.target.lng);
             if (distToTarget < 15 && minion.attackCd <= 0) {
                 minion.target.hp -= 15;
                 minion.attackCd = 30;
                 showEventMessage(`💀 Миньон атакует! ${minion.target.hp} ❤️`);
                 if (audioEnabled && hitSound) hitSound.play();
-                
-                // Визуальный эффект атаки миньона
-                const targetPoint = map.latLngToContainerPoint([minion.target.lat, minion.target.lng]);
-                const flash = document.createElement('div');
-                flash.className = 'minion-attack';
-                flash.style.left = targetPoint.x + 'px';
-                flash.style.top = targetPoint.y + 'px';
-                document.body.appendChild(flash);
-                setTimeout(() => flash.remove(), 200);
                 
                 if (minion.target.hp <= 0) {
                     killMonster(minion.target);
@@ -541,7 +521,6 @@
             }
             if (minion.attackCd > 0) minion.attackCd--;
         } else {
-            // Если нет цели, миньон идёт к игроку
             const dx = currentLocation.lat - minion.lat;
             const dy = currentLocation.lng - minion.lng;
             const len = Math.hypot(dx, dy);
@@ -597,7 +576,7 @@
     }
     
     function initMap() {
-        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 17);
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], currentZoom);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OSM',
             subdomains: 'abcd',
@@ -627,8 +606,18 @@
         });
     }
     
+    function setZoom(zoom) {
+        currentZoom = Math.min(19, Math.max(10, zoom));
+        document.getElementById('zoomValue').innerText = currentZoom;
+        if (map) map.setZoom(currentZoom);
+        if (currentLocation) centerOnPlayer();
+    }
+    
+    function zoomIn() { setZoom(currentZoom + 1); }
+    function zoomOut() { setZoom(currentZoom - 1); }
+    
     function centerOnPlayer() {
-        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], 17);
+        if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], currentZoom);
     }
     
     function getPlayerIcon() {
@@ -856,6 +845,11 @@
     window.onload = () => {
         initMap();
         startGPS();
+        
+        document.getElementById('zoomIn').onclick = zoomIn;
+        document.getElementById('zoomOut').onclick = zoomOut;
+        document.getElementById('zoomValue').innerText = currentZoom;
+        
         document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
         document.getElementById('summonBtn').onclick = () => {
             if (activeMode === 'summon') summonMinion();
@@ -881,11 +875,9 @@
         }, 2000);
         
         setInterval(() => {
-            updateMonstersMovement();  // Движение зомби к игроку
+            updateMonstersMovement();
             updateMinion();
         }, 500);
-        
-        // НЕТ АВТОРЕГЕНЕРАЦИИ!
     };
 </script>
 </body>
