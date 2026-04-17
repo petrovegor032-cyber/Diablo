@@ -38,7 +38,7 @@
             font-size: 0.9rem;
             color: #ffefb9;
         }
-        .stats-left { display: flex; gap: 20px; flex-wrap: wrap; }
+        .stats-left { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
         .stat-item {
             display: flex;
             align-items: center;
@@ -59,7 +59,7 @@
             text-overflow: ellipsis;
         }
         
-        /* Кнопки масштаба +/– (увеличенный шаг) */
+        /* Кнопки масштаба вертикально справа вверху */
         .zoom-controls {
             position: fixed;
             top: 80px;
@@ -148,26 +148,26 @@
         }
         .orb-content { display: none; }
         
-        /* Центральная панель информации о режиме — отдельно, не мешает кнопкам */
+        /* Центральная панель информации о режиме — компактно, без лишнего текста */
         .info-center {
             flex: 1;
             background: rgba(0,0,0,0.85);
             backdrop-filter: blur(12px);
             border-radius: 50px;
-            padding: 12px 20px;
+            padding: 8px 16px;
             margin-bottom: 10px;
             border: 1px solid #d4af37;
             text-align: center;
             font-weight: bold;
-            font-size: 1.1rem;
+            font-size: 1rem;
             color: #ffefb9;
             pointer-events: none;
         }
         
-        /* Панель действий — кнопки всегда активны */
+        /* Панель действий — прижата к низу, не наезжает */
         .action-bar {
             position: fixed;
-            bottom: 130px;
+            bottom: 120px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
@@ -231,9 +231,10 @@
         @media (max-width: 700px) {
             .orb { width: 65px; height: 65px; }
             .action-bar-btn { width: 50px; height: 50px; font-size: 20px; }
-            .action-bar { bottom: 110px; gap: 10px; padding: 6px 15px; }
+            .action-bar { bottom: 100px; gap: 10px; padding: 6px 15px; }
             .zoom-controls { top: 70px; right: 8px; padding: 6px 10px; }
             .zoom-btn { width: 36px; height: 36px; font-size: 20px; }
+            .info-center { font-size: 0.8rem; padding: 4px 12px; }
         }
     </style>
 </head>
@@ -256,7 +257,7 @@
     <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
 </div>
 
-<!-- Кнопки масштаба с шагом 2 -->
+<!-- Кнопки масштаба вертикально справа вверху -->
 <div class="zoom-controls">
     <div class="zoom-btn" id="zoomIn">+</div>
     <div class="zoom-value" id="zoomValue">17</div>
@@ -268,8 +269,7 @@
         <div class="orb-fill" id="hpFillOrb" style="height: 100%;"></div>
     </div>
     <div class="info-center" id="infoCenter">
-        <div class="mode-name">⚔️ Режим: Удар</div>
-        <div class="mode-cost">💰 Бесплатно</div>
+        ⚔️ Удар
     </div>
     <div class="orb orb-mana">
         <div class="orb-fill mana-fill" id="manaFillOrb" style="height: 100%;"></div>
@@ -286,8 +286,8 @@
 <script>
     // ============================================================
     //  НЕКРОМАНТ + МАСШТАБ +/– (шаг 2, от 10 до 22)
-    //  - Кнопки не налезают на информационную панель
-    //  - Магия (призыв) работает отдельно от режима
+    //  - Кнопки масштаба вертикально справа вверху
+    //  - Панель действий прижата к низу, компактная информация о режиме
     // ============================================================
     
     let map;
@@ -400,34 +400,33 @@
     }
     
     function useHpPotion() {
-        if (player.hpPotions <= 0) { showEventMessage('❌ Нет зелий лечения!', true); return; }
-        if (player.hp >= player.maxHp) { showEventMessage('❌ Здоровье уже полное', true); return; }
+        if (player.hpPotions <= 0) { showEventMessage('❌ Нет зелий!', true); return; }
+        if (player.hp >= player.maxHp) { showEventMessage('❤️ Уже полное', true); return; }
         player.hp = Math.min(player.maxHp, player.hp + 50);
         player.hpPotions--;
         updateUI();
         updatePotionUI();
-        showEventMessage('🧪 Зелье лечения +50 HP');
+        showEventMessage('🧪 +50 HP');
         if (audioEnabled && potionSound) potionSound.play();
         hitFlash();
     }
     
     function useManaPotion() {
         if (player.manaPotions <= 0) { showEventMessage('❌ Нет зелий маны!', true); return; }
-        if (player.mana >= player.maxMana) { showEventMessage('❌ Мана уже полная', true); return; }
+        if (player.mana >= player.maxMana) { showEventMessage('🪄 Мана полная', true); return; }
         player.mana = Math.min(player.maxMana, player.mana + 30);
         player.manaPotions--;
         updateUI();
         updatePotionUI();
-        showEventMessage('💧 Зелье маны +30 MP');
+        showEventMessage('💧 +30 MP');
         if (audioEnabled && potionSound) potionSound.play();
         hitFlash();
     }
     
-    // Призыв миньона (магия) — работает по нажатию на кнопку summonBtn
     function summonMinion() {
         if (!currentLocation) { showEventMessage('❌ Нет GPS', true); return; }
-        if (player.mana < SUMMON_MANA_COST) { showEventMessage('❌ Не хватает маны!', true); return; }
-        if (minion) { showEventMessage('❌ У вас уже есть миньон!', true); return; }
+        if (player.mana < SUMMON_MANA_COST) { showEventMessage('❌ Нет маны', true); return; }
+        if (minion) { showEventMessage('❌ Миньон уже есть', true); return; }
         
         player.mana -= SUMMON_MANA_COST;
         updateUI();
@@ -472,12 +471,12 @@
                 player.hp = Math.max(0, player.hp - 8);
                 updateUI();
                 m.attackCd = 30;
-                showEventMessage(`🧟 Зомби атакует! -8 HP`, true);
+                showEventMessage(`🧟 Атака! -8 HP`, true);
                 if (player.hp <= 0) {
                     player.hp = player.maxHp;
                     player.gold = Math.floor(player.gold * 0.7);
                     updateUI();
-                    showEventMessage(`💀 ВОСКРЕШЕНИЕ...`, true);
+                    showEventMessage(`💀 ВОСКРЕШЕНИЕ`, true);
                 }
                 hitFlash();
             }
@@ -673,11 +672,11 @@
         if (mode === 'melee') {
             meleeBtn.classList.add('active');
             summonBtn.classList.remove('active');
-            infoCenter.innerHTML = '<div class="mode-name">⚔️ Режим: Удар</div><div class="mode-cost">💰 Бесплатно</div>';
+            infoCenter.innerHTML = '⚔️ Удар';
         } else {
             meleeBtn.classList.remove('active');
             summonBtn.classList.add('active');
-            infoCenter.innerHTML = '<div class="mode-name">🧟 Режим: Призыв</div><div class="mode-cost">🪄 Стоимость: 50 маны</div>';
+            infoCenter.innerHTML = '🧟 Призыв (50)';
         }
     }
     
@@ -751,7 +750,7 @@
         if (obj.type === 'altar') {
             player.hp = player.maxHp;
             player.mana = player.maxMana;
-            showEventMessage(`🗿 Алтарь восстановил здоровье и ману!`);
+            showEventMessage(`🗿 Алтарь восстановил всё!`);
             if (audioEnabled && collectSound) collectSound.play();
         } else {
             player.gold += obj.gold;
@@ -855,9 +854,7 @@
         document.getElementById('zoomOut').onclick = zoomOut;
         document.getElementById('zoomValue').innerText = currentZoom;
         
-        // Кнопка Удар — переключает режим на melee
         document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
-        // Кнопка Призыва — сначала переключает режим, а по второму нажатию призывает
         document.getElementById('summonBtn').onclick = () => {
             if (activeMode === 'summon') {
                 summonMinion();
