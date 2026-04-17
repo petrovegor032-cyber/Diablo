@@ -59,7 +59,7 @@
             text-overflow: ellipsis;
         }
         
-        /* Кнопки масштаба +/– */
+        /* Кнопки масштаба +/– (увеличенный шаг) */
         .zoom-controls {
             position: fixed;
             top: 80px;
@@ -148,6 +148,7 @@
         }
         .orb-content { display: none; }
         
+        /* Центральная панель информации о режиме — отдельно, не мешает кнопкам */
         .info-center {
             flex: 1;
             background: rgba(0,0,0,0.85);
@@ -160,9 +161,10 @@
             font-weight: bold;
             font-size: 1.1rem;
             color: #ffefb9;
+            pointer-events: none;
         }
         
-        /* Панель действий */
+        /* Панель действий — кнопки всегда активны */
         .action-bar {
             position: fixed;
             bottom: 130px;
@@ -254,7 +256,7 @@
     <div class="event-area" id="eventMessage">🔮 Добро пожаловать</div>
 </div>
 
-<!-- Кнопки масштаба -->
+<!-- Кнопки масштаба с шагом 2 -->
 <div class="zoom-controls">
     <div class="zoom-btn" id="zoomIn">+</div>
     <div class="zoom-value" id="zoomValue">17</div>
@@ -283,7 +285,9 @@
 
 <script>
     // ============================================================
-    //  НЕКРОМАНТ + МАСШТАБ +/–
+    //  НЕКРОМАНТ + МАСШТАБ +/– (шаг 2, от 10 до 22)
+    //  - Кнопки не налезают на информационную панель
+    //  - Магия (призыв) работает отдельно от режима
     // ============================================================
     
     let map;
@@ -419,6 +423,7 @@
         hitFlash();
     }
     
+    // Призыв миньона (магия) — работает по нажатию на кнопку summonBtn
     function summonMinion() {
         if (!currentLocation) { showEventMessage('❌ Нет GPS', true); return; }
         if (player.mana < SUMMON_MANA_COST) { showEventMessage('❌ Не хватает маны!', true); return; }
@@ -607,14 +612,14 @@
     }
     
     function setZoom(zoom) {
-        currentZoom = Math.min(19, Math.max(10, zoom));
+        currentZoom = Math.min(22, Math.max(10, zoom));
         document.getElementById('zoomValue').innerText = currentZoom;
         if (map) map.setZoom(currentZoom);
         if (currentLocation) centerOnPlayer();
     }
     
-    function zoomIn() { setZoom(currentZoom + 1); }
-    function zoomOut() { setZoom(currentZoom - 1); }
+    function zoomIn() { setZoom(currentZoom + 2); }
+    function zoomOut() { setZoom(currentZoom - 2); }
     
     function centerOnPlayer() {
         if (currentLocation) map.setView([currentLocation.lat, currentLocation.lng], currentZoom);
@@ -850,10 +855,15 @@
         document.getElementById('zoomOut').onclick = zoomOut;
         document.getElementById('zoomValue').innerText = currentZoom;
         
+        // Кнопка Удар — переключает режим на melee
         document.getElementById('meleeBtn').onclick = () => setActiveMode('melee');
+        // Кнопка Призыва — сначала переключает режим, а по второму нажатию призывает
         document.getElementById('summonBtn').onclick = () => {
-            if (activeMode === 'summon') summonMinion();
-            else setActiveMode('summon');
+            if (activeMode === 'summon') {
+                summonMinion();
+            } else {
+                setActiveMode('summon');
+            }
         };
         document.getElementById('hpPotionBtn').onclick = () => useHpPotion();
         document.getElementById('manaPotionBtn').onclick = () => useManaPotion();
